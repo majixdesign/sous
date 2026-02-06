@@ -10,7 +10,7 @@ import urllib.parse
 import streamlit.components.v1 as components
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Sous v3.0", page_icon="🍳", layout="wide")
+st.set_page_config(page_title="Sous v3.1", page_icon="🍳", layout="wide")
 
 # --- 1. DESIGN SYSTEM ---
 st.markdown("""
@@ -70,15 +70,15 @@ if not api_key:
 genai.configure(api_key=api_key)
 
 def get_working_model():
-    # Priority: Flash 1.5 because it supports JSON Mode reliably and is fast
-    return genai.GenerativeModel("models/gemini-1.5-flash")
+    # Switching to PRO for better stability
+    return genai.GenerativeModel("models/gemini-1.5-pro")
 
 model = get_working_model()
 
 # --- 3. HELPER FUNCTIONS ---
 
 def extract_items(data):
-    """Bouncer: Removes junk data."""
+    """Bouncer: Removes junk data and forces strings."""
     items = []
     IGNORE_LIST = ["none", "null", "n/a", "undefined", "", "missing", "optional"]
     
@@ -86,26 +86,41 @@ def extract_items(data):
         for v in data.values(): items.extend(extract_items(v))
     elif isinstance(data, list):
         for item in data: items.extend(extract_items(item))
-    elif isinstance(data, str) or isinstance(data, int) or isinstance(data, float):
+    elif data is not None:
+        # FORCE STRING CONVERSION IMMEDIATELY
         clean_text = str(data).strip()
         if len(clean_text) > 2 and clean_text.lower() not in IGNORE_LIST:
             items.append(clean_text)
             
     return items
 
-def generate_json_safe(prompt):
+def robust_api_call(prompt):
     """
-    Uses Gemini's Native JSON Mode.
-    This forces the model to output ONLY valid JSON, eliminating parsing errors.
+    The 'Double-Tap' Engine.
+    1. Tries Native JSON Mode.
+    2. If that fails, fails over to Regex Parsing.
     """
+    # Attempt 1: Native JSON
     try:
         response = model.generate_content(
-            prompt,
+            prompt, 
             generation_config={"response_mime_type": "application/json"}
         )
         return json.loads(response.text)
-    except Exception as e:
-        return None
+    except Exception:
+        # Attempt 2: Brute Force Regex
+        try:
+            response = model.generate_content(prompt)
+            text = response.text
+            # Strip Markdown wrappers
+            text = text.replace("```json", "").replace("```", "").strip()
+            # Find the largest {...} block
+            match = re.search(r'\{.*\}', text, re.DOTALL)
+            if match:
+                return json.loads(match.group(0))
+        except Exception:
+            return None
+    return None
 
 def copy_to_clipboard_button(text):
     escaped_text = text.replace("\n", "\\n").replace("\"", "\\\"")
@@ -152,8 +167,7 @@ if "toast_shown" not in st.session_state: st.session_state.toast_shown = False
 
 c_title, c_surprise = st.columns([4, 1])
 with c_title:
-    # UPDATED TITLE TO VERIFY DEPLOYMENT
-    st.title("Sous v3.0 (Fixed)")
+    st.title("Sous v3.1")
     st.caption("The adaptive kitchen co-pilot.")
 with c_surprise:
     st.write("") 
@@ -202,8 +216,8 @@ if submitted or st.session_state.trigger_search:
             
             Output: JSON only.
             """
-            # NATIVE JSON MODE
-            data = generate_json_safe(prompt)
+            
+            data = robust_api_call(prompt)
             
             if data:
                 st.session_state.ingredients = data
@@ -219,13 +233,12 @@ if st.session_state.ingredients:
     data = st.session_state.ingredients
     data = {k.lower(): v for k, v in data.items()}
     
-    # Simple extraction (JSON Mode guarantees keys exist usually, but we safeguard)
+    # Robust key search
     list_core = extract_items(data.get('core') or data.get('must_haves') or [])
     list_character = extract_items(data.get('character') or data.get('soul') or [])
-
-    # If JSON Mode fails to give keys (rare), assume list 1 is core
+    
+    # Fallback if keys are weird
     if not list_core and not list_character:
-         # Fallback to values if flattened
          lists = [v for v in data.values() if isinstance(v, list)]
          if len(lists) > 0: list_core = extract_items(lists[0])
          if len(lists) > 1: list_character = extract_items(lists[1])
@@ -237,7 +250,6 @@ if st.session_state.ingredients:
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("🧱 **The Core (Non-Negotiables)**")
-        # FORCE STRING CAST (Fixes TypeError from Screenshot)
         core_checks = [st.checkbox(str(i), True, key=f"c_{x}") for x, i in enumerate(list_core)]
     with c2:
         st.markdown("✨ **The Character (Negotiable)**")
@@ -272,8 +284,7 @@ if st.session_state.ingredients:
                     "chef_tip": "A pro tip."
                 }}
                 """
-                # NATIVE JSON MODE
-                r_data = generate_json_safe(final_prompt)
+                r_data = robust_api_call(final_prompt)
                 
                 if r_data:
                     st.session_state.recipe_data = r_data
