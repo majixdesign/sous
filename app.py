@@ -23,7 +23,7 @@ st.markdown("""
             color: #1a1a1a;
         }
 
-        /* Title - Now using Archivo Black/Bold */
+        /* Title */
         h1 {
             font-family: 'Archivo', sans-serif !important;
             font-weight: 700 !important;
@@ -165,6 +165,40 @@ def copy_to_clipboard_button(text):
         </button>
         """,
         height=50
+    )
+
+def speak_text_button(text):
+    """
+    Browser-native Text-to-Speech (Zero API Cost)
+    """
+    escaped_text = text.replace("\n", " ").replace("\"", "'")
+    components.html(
+        f"""
+        <script>
+        function speak() {{
+            window.speechSynthesis.cancel(); // Stop previous
+            const msg = new SpeechSynthesisUtterance("{escaped_text}");
+            msg.rate = 0.9; // Slightly slower for clarity
+            msg.pitch = 1.0;
+            window.speechSynthesis.speak(msg);
+        }}
+        </script>
+        <button onclick="speak()" style="
+            background-color: #ffffff; 
+            border: 1px solid #000; 
+            border-radius: 8px; 
+            padding: 8px 15px; 
+            font-family: 'Archivo', sans-serif; 
+            font-size: 13px; 
+            cursor: pointer; 
+            width: 100%;
+            font-weight: 600;
+            color: #000;
+            margin-bottom: 10px;">
+            🔊 Read Instructions
+        </button>
+        """,
+        height=45
     )
 
 GLOBAL_DISHES = [
@@ -357,9 +391,21 @@ if st.session_state.recipe_data:
                 
     with c_step:
         with st.container(border=True):
+            # HEADER + AUDIO BUTTON
             st.markdown("**🔥 Instructions**")
+            
+            # COMPILE TEXT FOR SPEECH
+            speech_text = f"Recipe for {st.session_state.dish_name}. "
+            if show_strategy: speech_text += f"Strategy: {pivot_msg}. "
+            speech_text += "Instructions: "
+            for s in r.get('steps', []):
+                clean = re.sub(r'^\d+\.?\s*', '', s)
+                speech_text += f"{clean}. "
+                
+            speak_text_button(speech_text)
+            
+            # STEPS
             for idx, step in enumerate(r.get('steps', [])):
-                # CLEANER: Remove existing numbers like "1." from the AI text
                 clean_step = re.sub(r'^\d+\.?\s*', '', step)
                 st.markdown(f"**{idx+1}.** {clean_step}")
             
