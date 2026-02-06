@@ -10,7 +10,7 @@ import urllib.parse
 import streamlit.components.v1 as components
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Sous v3.3", page_icon="🍳", layout="wide")
+st.set_page_config(page_title="Sous v3.4", page_icon="🍳", layout="wide")
 
 # --- 1. DESIGN SYSTEM ---
 st.markdown("""
@@ -69,67 +69,50 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# --- 3. THE "MODEL HUNTER" (Fixes 404 Error) ---
+# --- 3. THE "MODEL HUNTER" ---
 def get_working_model():
-    """
-    Asks the API what models are available and picks the best one.
-    This prevents '404 Model Not Found' errors.
-    """
     try:
-        # 1. List all models available to your API Key
         all_models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # 2. Look for 'Flash' (Fastest)
         flash_models = [m.name for m in all_models if 'flash' in m.name.lower()]
-        if flash_models:
-            # Pick the newest flash model found
-            return genai.GenerativeModel(flash_models[0])
-            
-        # 3. Look for 'Pro' (Backup)
+        if flash_models: return genai.GenerativeModel(flash_models[0])
         pro_models = [m.name for m in all_models if 'pro' in m.name.lower()]
-        if pro_models:
-            return genai.GenerativeModel(pro_models[0])
-            
-        # 4. Fallback to whatever exists
-        if all_models:
-            return genai.GenerativeModel(all_models[0].name)
-            
-        # 5. Last Resort (Hardcoded legacy)
+        if pro_models: return genai.GenerativeModel(pro_models[0])
+        if all_models: return genai.GenerativeModel(all_models[0].name)
         return genai.GenerativeModel("models/gemini-pro")
-        
-    except Exception as e:
-        # If listing fails, try the standard name
+    except:
         return genai.GenerativeModel("models/gemini-1.5-flash")
 
 model = get_working_model()
 
 # --- 4. HELPER FUNCTIONS ---
 
-def extract_items(data):
-    """Bouncer: Removes junk data and forces strings."""
-    items = []
-    IGNORE_LIST = ["none", "null", "n/a", "undefined", "", "missing", "optional"]
+def clean_list(raw_list):
+    """
+    Surgical Cleaner: Takes a specific list and removes junk.
+    Does NOT recurse blindly.
+    """
+    clean_items = []
+    IGNORE_LIST = ["none", "null", "n/a", "undefined", "", "missing", "optional", "core", "character", "must_haves", "soul"]
     
-    if isinstance(data, dict):
-        for v in data.values(): items.extend(extract_items(v))
-    elif isinstance(data, list):
-        for item in data: items.extend(extract_items(item))
-    elif data is not None:
-        clean_text = str(data).strip()
-        if len(clean_text) > 2 and clean_text.lower() not in IGNORE_LIST:
-            items.append(clean_text)
-            
-    return items
+    if isinstance(raw_list, list):
+        for item in raw_list:
+            # Recursion only for nested lists, NOT dicts
+            if isinstance(item, list):
+                clean_items.extend(clean_list(item))
+            elif isinstance(item, str):
+                s = item.strip()
+                # Remove Markdown bullets if AI added them
+                s = s.replace("- ", "").replace("* ", "")
+                if len(s) > 2 and s.lower() not in IGNORE_LIST:
+                    clean_items.append(s)
+            elif isinstance(item, dict):
+                 # If AI gave objects like {"name": "Salt"}, try to grab values
+                 clean_items.extend(clean_list(list(item.values())))
+
+    return clean_items
 
 def robust_api_call(prompt):
-    """
-    The 'Double-Tap' Engine.
-    1. Tries Native JSON Mode.
-    2. If that fails, fails over to Regex Parsing.
-    """
     last_error = None
-    
-    # Attempt 1: Native JSON
     try:
         response = model.generate_content(
             prompt, 
@@ -139,18 +122,15 @@ def robust_api_call(prompt):
     except Exception as e:
         last_error = e
 
-    # Attempt 2: Brute Force Regex (Fallback)
     try:
         response = model.generate_content(prompt)
-        text = response.text
-        text = text.replace("```json", "").replace("```", "").strip()
+        text = response.text.replace("```json", "").replace("```", "").strip()
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             return json.loads(match.group(0))
     except Exception as e:
         last_error = e
         
-    # Return Error String to debug
     return f"ERROR: {str(last_error)}"
 
 def copy_to_clipboard_button(text):
@@ -198,7 +178,7 @@ if "toast_shown" not in st.session_state: st.session_state.toast_shown = False
 
 c_title, c_surprise = st.columns([4, 1])
 with c_title:
-    st.title("Sous v3.3")
+    st.title("Sous v3.4")
     st.caption("The adaptive kitchen co-pilot.")
 with c_surprise:
     st.write("") 
@@ -234,18 +214,17 @@ if submitted or st.session_state.trigger_search:
             
             Task: Break down ingredients into exactly 2 categories.
             
-            1. "core": THE PHYSICS & STRUCTURE (Non-Negotiable)
-               - The Main Ingredients (Meat, Rice, Pasta, Eggs for Omelet).
-               - The Physics Essentials (Cooking Oil/Fat, Salt, Water).
-               - The Flavor Base (Onions/Garlic for Curry, Canned Tomato for Pasta).
-               - WITHOUT THESE, THE DISH FAILS.
-               
-            2. "character": THE FLAVOR & SOUL (Negotiable/Swappable)
-               - Fresh Herbs (Parsley, Cilantro).
-               - Dried Spices (Cumin, Paprika).
-               - Acids & Garnishes (Lemon, Cheese toppings).
-            
-            Output: JSON only.
+            OUTPUT JSON STRUCTURE ONLY:
+            {{
+                "core": ["Ingredient 1", "Ingredient 2", "Ingredient 3"],
+                "character": ["Ingredient 4", "Ingredient 5"]
+            }}
+
+            RULES:
+            1. "core": Non-Negotiables (Proteins, Rice/Pasta, Oil, Salt, Water).
+            2. "character": Negotiables (Spices, Herbs, Garnishes).
+            3. Do NOT include descriptions or headers inside the list. Just ingredient names.
+            4. No "None" or null values.
             """
             
             data = robust_api_call(prompt)
@@ -262,17 +241,26 @@ if st.session_state.ingredients:
         st.session_state.toast_shown = True
 
     data = st.session_state.ingredients
-    data = {k.lower(): v for k, v in data.items()}
+    # Normalize keys to lowercase for matching
+    data_lower = {k.lower(): v for k, v in data.items()}
     
-    # Robust key search
-    list_core = extract_items(data.get('core') or data.get('must_haves') or [])
-    list_character = extract_items(data.get('character') or data.get('soul') or [])
+    # --- SURGICAL EXTRACTION ---
+    # We look for specific keys. We do NOT pass the whole dict to the cleaner.
     
-    # Fallback
-    if not list_core and not list_character:
-         lists = [v for v in data.values() if isinstance(v, list)]
-         if len(lists) > 0: list_core = extract_items(lists[0])
-         if len(lists) > 1: list_character = extract_items(lists[1])
+    # 1. Try to find Core
+    raw_core = data_lower.get('core') or data_lower.get('must_haves') or []
+    # 2. Try to find Character
+    raw_char = data_lower.get('character') or data_lower.get('soul') or []
+
+    # 3. Fallback: If specific keys missing, grab by index (dangerous but necessary backup)
+    if not raw_core and not raw_char:
+        all_lists = [v for v in data.values() if isinstance(v, list)]
+        if len(all_lists) > 0: raw_core = all_lists[0]
+        if len(all_lists) > 1: raw_char = all_lists[1]
+    
+    # 4. Clean the lists
+    list_core = clean_list(raw_core)
+    list_character = clean_list(raw_char)
 
     st.divider()
     st.subheader(f"Inventory: {st.session_state.dish_name}")
