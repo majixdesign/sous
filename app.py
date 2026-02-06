@@ -6,11 +6,12 @@ import json
 import re
 import time
 import random
+import urllib.parse
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Sous", page_icon="🍽️", layout="wide")
 
-# --- 1. DESIGN SYSTEM (CSS) ---
+# --- 1. DESIGN SYSTEM (Simple Home Edit Style) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;600&family=Playfair+Display:wght@700&display=swap');
@@ -34,34 +35,37 @@ st.markdown("""
             font-family: 'Archivo', sans-serif !important;
         }
 
-        /* Buttons */
+        /* Minimalist Black Buttons */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"] {
             background-color: #000000 !important;
             color: #ffffff !important;
             border: none;
-            padding: 0.5rem 1rem;
+            padding: 0.6rem 1.2rem;
             font-family: 'Archivo', sans-serif;
+            font-weight: 500;
             transition: all 0.3s ease;
         }
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"]:hover {
             background-color: #333333 !important;
+            transform: translateY(-1px);
         }
 
         /* Checkboxes */
         div[data-testid="stCheckbox"] label span {
-            font-size: 1.1rem;
+            font-size: 1.05rem;
         }
         
         /* Footer */
         .footer {
             position: fixed;
-            bottom: 10px;
-            right: 10px;
+            bottom: 15px;
+            right: 15px;
             font-size: 0.8rem;
-            color: #ccc;
+            color: #aaa;
             font-family: 'Archivo', sans-serif;
+            text-align: right;
         }
-
+        
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
@@ -81,7 +85,6 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# --- MODEL SELECTOR ---
 def get_working_model():
     try:
         my_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
@@ -94,26 +97,38 @@ def get_working_model():
 
 model = get_working_model()
 
-# --- HELPER: DATA SANITIZER (FIXED) ---
+# --- 3. HELPER LIBRARIES ---
+
+# The "Bouncer": Ruthlessly cleans bad data
 def extract_items(data):
-    """Recursively extracts strings, filtering out 'None'/'Null'."""
     items = []
-    # Words to strictly ignore
-    IGNORE_LIST = ["none", "null", "n/a", "undefined", ""]
+    # Blacklist of junk words
+    IGNORE_LIST = ["none", "null", "n/a", "undefined", "", "missing", "optional"]
 
     if isinstance(data, dict):
         for v in data.values(): items.extend(extract_items(v))
     elif isinstance(data, list):
         for item in data: items.extend(extract_items(item))
-    elif isinstance(data, str):
-        if data.lower().strip() not in IGNORE_LIST:
-            items.append(data)
-    elif data is not None:
-        if str(data).lower().strip() not in IGNORE_LIST:
-            items.append(str(data))
+    elif isinstance(data, str) or isinstance(data, int) or isinstance(data, float):
+        clean_text = str(data).strip()
+        # Filter: Must be longer than 2 chars and NOT in blacklist
+        if len(clean_text) > 2 and clean_text.lower() not in IGNORE_LIST:
+            items.append(clean_text)
+            
     return items
 
-# --- GLOBAL DISHES ---
+# Random Culinary Phrases
+CULINARY_PHRASES = [
+    "Bon Appétit (French for 'Good Appetite')",
+    "Itadakimasu (Japanese for 'I humbly receive')",
+    "Buen Provecho (Spanish for 'Enjoy your meal')",
+    "Smaklig Måltid (Swedish for 'Tasty Meal')",
+    "Makan (Malay/Indonesian for 'Eat')",
+    "Kali Orexi (Greek for 'Good Appetite')",
+    "Saa Wa Dee (Thai greeting often used before meals)"
+]
+
+# Global Dishes for Surprise Me
 GLOBAL_DISHES = [
     "Shakshuka", "Pad Thai", "Chicken Tikka Masala", "Beef Wellington", "Bibimbap",
     "Moussaka", "Paella", "Ramen", "Tacos al Pastor", "Coq au Vin",
@@ -127,8 +142,9 @@ if "dish_name" not in st.session_state: st.session_state.dish_name = ""
 if "generated_recipe" not in st.session_state: st.session_state.generated_recipe = False
 if "trigger_search" not in st.session_state: st.session_state.trigger_search = False
 if "recipe_text" not in st.session_state: st.session_state.recipe_text = ""
+if "daily_phrase" not in st.session_state: st.session_state.daily_phrase = random.choice(CULINARY_PHRASES)
 
-# --- 3. UI LAYOUT ---
+# --- 4. UI LAYOUT ---
 
 # HEADER
 c_title, c_surprise = st.columns([4, 1])
@@ -173,6 +189,7 @@ if submitted or st.session_state.trigger_search:
             2. "soul": Flavor builders.
             3. "foundation": Shelf-stable seasonings.
             
+            IMPORTANT: If a category is empty, return an empty list []. Do NOT write "None".
             Return ONLY valid JSON. Simple strings only.
             """
             try:
@@ -192,9 +209,11 @@ if submitted or st.session_state.trigger_search:
             except Exception as e:
                 status.update(label="Connection Error", state="error")
 
-# --- 4. OUTPUT DASHBOARD ---
+# --- OUTPUT DASHBOARD ---
 if st.session_state.ingredients:
     data = st.session_state.ingredients
+    
+    # Run the "Bouncer" sanitizer
     list_must = extract_items(data.get('must_haves') or data.get('must_have'))
     list_soul = extract_items(data.get('soul') or data.get('flavor'))
     list_foundation = extract_items(data.get('foundation') or data.get('pantry'))
@@ -268,25 +287,18 @@ if st.session_state.ingredients:
                 st.markdown(st.session_state.recipe_text)
                 st.divider()
                 
-                # --- ACTION BUTTONS (Copy, Share, Rate) ---
+                # --- ACTION BAR ---
                 ac1, ac2, ac3 = st.columns(3)
                 
                 with ac1:
-                    # COPY
-                    st.download_button(
-                        label="📄 Download Recipe",
-                        data=st.session_state.recipe_text,
-                        file_name=f"{st.session_state.dish_name}_Sous.md",
-                        mime="text/markdown",
-                        use_container_width=True
-                    )
+                    # COPY (Visual cue, user uses native copy)
+                    st.caption("📋 Copy text above")
                 
                 with ac2:
-                    # SHARE (Mailto link)
-                    subject = f"Recipe: {st.session_state.dish_name} by Sous"
-                    body = "Here is the recipe I generated with Sous..."
-                    mailto_link = f"mailto:?subject={subject}&body={body}"
-                    st.link_button("✉️ Share via Email", mailto_link, use_container_width=True)
+                    # WHATSAPP SHARE
+                    text_to_share = f"Check out this {st.session_state.dish_name} recipe I made with Sous!"
+                    encoded_text = urllib.parse.quote(text_to_share)
+                    st.link_button("💬 Share on WhatsApp", f"https://wa.me/?text={encoded_text}", use_container_width=True)
                 
                 with ac3:
                     # NEW START
@@ -294,9 +306,9 @@ if st.session_state.ingredients:
                         st.session_state.clear()
                         st.rerun()
 
-                # RATE
+                # RATE (Visual only for now)
                 st.write("")
-                st.caption("How was this recipe?")
+                st.caption("Rate this recipe (Feedback is anonymous)")
                 rating = st.slider("Rating", 1, 5, 5, label_visibility="collapsed")
                 if st.button("Submit Rating"):
                     st.toast("Thank you! Feedback recorded.", icon="⭐")
@@ -307,4 +319,4 @@ if st.session_state.ingredients:
         st.error("🛑 Missing Essentials. Cannot cook safely.")
 
 # --- FOOTER ---
-st.markdown('<div class="footer">Powered by Gemini</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">{st.session_state.daily_phrase} <br> Powered by Gemini</div>', unsafe_allow_html=True)
