@@ -52,19 +52,9 @@ model = get_working_model()
 
 # --- HELPER: SMART LIST EXTRACTOR ---
 def extract_items(data_section):
-    """
-    Handles cases where AI returns a Dict (Key:Value) OR a List.
-    Always returns a clean list of strings.
-    """
-    if not data_section:
-        return []
-    
-    if isinstance(data_section, list):
-        return data_section
-        
-    if isinstance(data_section, dict):
-        return list(data_section.values())
-        
+    if not data_section: return []
+    if isinstance(data_section, list): return data_section
+    if isinstance(data_section, dict): return list(data_section.values())
     return []
 
 # 2. Header
@@ -94,14 +84,15 @@ if submitted and dish:
     
     with st.status("👨‍🍳 Sous is organizing the kitchen...", expanded=True) as status:
         
+        # --- FIX 1: Redefining "Vitals" to include Aromatics ---
         prompt = f"""
         I want to cook {dish} for {servings} people. 
-        If generic (like "Biryani"), assume the most authentic version (e.g. Mutton/Chicken) but include "Main Protein" in the ingredient name.
+        If generic (like "Biryani"), assume the most authentic version but include "Main Protein" in the ingredient name.
         
         Break down ingredients into a JSON object with these 3 keys:
-        1. "must_haves": The absolute core items (Meat, Rice, Pasta, Main Veg).
-        2. "soul": Flavor builders (Fresh Herbs, Whole Spices, Ghee, Saffron, Wine).
-        3. "foundation": The pantry basics (Onions, Tomatoes, Ginger-Garlic, Oil, Spices like Turmeric/Chili, Salt).
+        1. "must_haves": The absolute CORE items. This MUST include the Meat/Veg, Rice/Pasta, AND key aromatics like Onions, Ginger, Garlic.
+        2. "soul": Flavor builders (Fresh Herbs, Whole Spices, Ghee, Saffron, Wine, Cheese).
+        3. "foundation": The pantry basics (Oil, Powdered Spices like Turmeric/Chili, Salt, Water).
         
         Return ONLY valid JSON. Return the ingredients as simple Strings in a List.
         """
@@ -111,14 +102,12 @@ if submitted and dish:
             response = model.generate_content(prompt)
             st.session_state.raw_response = response.text 
             
-            # --- CLEANER ---
             text = response.text.replace("```json", "").replace("```", "").strip()
             match = re.search(r'\{.*\}', text, re.DOTALL)
             if match:
                 clean_json = match.group(0)
                 data = json.loads(clean_json)
                 
-                # Normalize keys to lowercase
                 normalized_data = {}
                 for k, v in data.items():
                     normalized_data[k.lower()] = v
@@ -137,7 +126,6 @@ if submitted and dish:
 if st.session_state.ingredients:
     data = st.session_state.ingredients
     
-    # Extract Lists
     raw_must = data.get('must_haves') or data.get('must_have')
     list_must = extract_items(raw_must)
     
@@ -183,8 +171,7 @@ if st.session_state.ingredients:
     st.write("") 
     if all(must_haves) and list_must:
         
-        # --- FIX: Calculate Missing Items HERE (Global Scope) ---
-        # This ensures 'all_missing' exists even if we don't click the button today.
+        # Calculate Missing Items HERE (Global Scope)
         all_missing = soul_missing + pantry_missing
         confirmed_inventory = list_must + soul_available + pantry_available
         
@@ -195,18 +182,23 @@ if st.session_state.ingredients:
             if "recipe_text" not in st.session_state or gen_btn:
                 with st.spinner("👨‍🍳 Chef is planning the strategy..."):
                     
+                    # --- FIX 2: STRICTER PROMPT ---
                     final_prompt = f"""
                     Act as 'Sous', a warm, expert home chef.
                     Create a recipe for {st.session_state.dish_name} ({servings} servings).
                     
-                    CRITICAL INVENTORY CONTEXT:
-                    1. User CONFIRMED they have: {confirmed_inventory}. USE THESE EXACTLY.
+                    CRITICAL INVENTORY RULES:
+                    1. User CONFIRMED they have: {confirmed_inventory}.
                     2. User is MISSING: {all_missing}.
                     
+                    STRICT CONSTRAINT: 
+                    If an ingredient is listed as MISSING, do NOT list it in the "Ingredients" section. 
+                    If it is vital (like Salt), mention in the steps that it is omitted or substituted, but do NOT put it in the shopping list.
+                    
                     Structure:
-                    1. **The Strategy:** A quick opening note. If key flavor items are missing, explain the workaround.
-                    2. **The Mise en Place:** List the exact ingredients to use.
-                    3. **The Cook:** Step-by-step, descriptive instructions. Focus on sensory cues (smell, color).
+                    1. **The Strategy:** A quick opening note. If items are missing (like Salt/Spices), explain the workaround or the compromise.
+                    2. **The Mise en Place:** List ONLY the confirmed ingredients.
+                    3. **The Cook:** Step-by-step instructions using ONLY what we have.
                     4. **Chef's Tip:** One pro tip at the end.
                     """
                     try:
@@ -235,7 +227,7 @@ if st.session_state.ingredients:
     else:
         st.error("🛑 You are missing a Vital Ingredient. We can't cook this dish without it.")
 
-# --- DEBUG SECTION (Keep until stable) ---
+# --- DEBUG SECTION ---
 with st.expander("🛠️ Debug Data (For Developer)"):
     if st.session_state.ingredients:
         st.write("Parsed Data:")
