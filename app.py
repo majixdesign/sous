@@ -10,7 +10,7 @@ import urllib.parse
 import streamlit.components.v1 as components
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Sous v3.2", page_icon="🍳", layout="wide")
+st.set_page_config(page_title="Sous v3.3", page_icon="🍳", layout="wide")
 
 # --- 1. DESIGN SYSTEM ---
 st.markdown("""
@@ -69,13 +69,41 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
+# --- 3. THE "MODEL HUNTER" (Fixes 404 Error) ---
 def get_working_model():
-    # REVERTED TO FLASH FOR STABILITY & RATE LIMITS
-    return genai.GenerativeModel("models/gemini-1.5-flash")
+    """
+    Asks the API what models are available and picks the best one.
+    This prevents '404 Model Not Found' errors.
+    """
+    try:
+        # 1. List all models available to your API Key
+        all_models = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        # 2. Look for 'Flash' (Fastest)
+        flash_models = [m.name for m in all_models if 'flash' in m.name.lower()]
+        if flash_models:
+            # Pick the newest flash model found
+            return genai.GenerativeModel(flash_models[0])
+            
+        # 3. Look for 'Pro' (Backup)
+        pro_models = [m.name for m in all_models if 'pro' in m.name.lower()]
+        if pro_models:
+            return genai.GenerativeModel(pro_models[0])
+            
+        # 4. Fallback to whatever exists
+        if all_models:
+            return genai.GenerativeModel(all_models[0].name)
+            
+        # 5. Last Resort (Hardcoded legacy)
+        return genai.GenerativeModel("models/gemini-pro")
+        
+    except Exception as e:
+        # If listing fails, try the standard name
+        return genai.GenerativeModel("models/gemini-1.5-flash")
 
 model = get_working_model()
 
-# --- 3. HELPER FUNCTIONS ---
+# --- 4. HELPER FUNCTIONS ---
 
 def extract_items(data):
     """Bouncer: Removes junk data and forces strings."""
@@ -122,7 +150,7 @@ def robust_api_call(prompt):
     except Exception as e:
         last_error = e
         
-    # Return Error if both fail
+    # Return Error String to debug
     return f"ERROR: {str(last_error)}"
 
 def copy_to_clipboard_button(text):
@@ -166,11 +194,11 @@ if "recipe_data" not in st.session_state: st.session_state.recipe_data = None
 if "trigger_search" not in st.session_state: st.session_state.trigger_search = False
 if "toast_shown" not in st.session_state: st.session_state.toast_shown = False
 
-# --- 4. UI LAYOUT ---
+# --- 5. UI LAYOUT ---
 
 c_title, c_surprise = st.columns([4, 1])
 with c_title:
-    st.title("Sous v3.2")
+    st.title("Sous v3.3")
     st.caption("The adaptive kitchen co-pilot.")
 with c_surprise:
     st.write("") 
@@ -225,7 +253,6 @@ if submitted or st.session_state.trigger_search:
             if isinstance(data, dict):
                 st.session_state.ingredients = data
             else:
-                # SHOW ACTUAL ERROR FOR DEBUGGING
                 st.error(f"Sous couldn't read the recipe book.\nTechnical Details: {data}")
 
 # --- DASHBOARD ---
