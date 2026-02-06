@@ -1,3 +1,4 @@
+# Force Update: Dynamic Model Selector
 import streamlit as st
 import google.generativeai as genai
 import os
@@ -50,6 +51,24 @@ def get_working_model():
 
 model = get_working_model()
 
+# --- HELPER: SMART LIST EXTRACTOR ---
+def extract_items(data_section):
+    """
+    Handles cases where AI returns a Dict (Key:Value) OR a List.
+    Always returns a clean list of strings (the actual ingredients).
+    """
+    if not data_section:
+        return []
+    
+    if isinstance(data_section, list):
+        return data_section
+        
+    if isinstance(data_section, dict):
+        # If it's a dict (like in your screenshot), we want the VALUES ("Mutton 500g"), not the keys ("meat").
+        return list(data_section.values())
+        
+    return []
+
 # 2. Header
 st.title("Sous 🍳")
 st.caption("Your smart kitchen co-pilot. (Powered by Gemini)")
@@ -77,33 +96,32 @@ if submitted and dish:
     
     with st.status("👨‍🍳 Sous is organizing the kitchen...", expanded=True) as status:
         
+        # PROMPT: We ask for lists, but the code below now handles dicts too if it disobeys.
         prompt = f"""
         I want to cook {dish} for {servings} people. 
-        If the dish name is generic (like "Biryani"), assume the most popular authentic version but label the protein clearly.
+        If generic (like "Biryani"), assume the most authentic version (e.g. Mutton/Chicken) but include "Main Protein" in the ingredient name.
         
-        Break down ingredients into a JSON object. Use EXACTLY these 3 keys (lowercase):
+        Break down ingredients into a JSON object with these 3 keys:
         1. "must_haves": The absolute core items (Meat, Rice, Pasta, Main Veg).
-        2. "soul": Flavor builders (Fresh Herbs, Whole Spices, Ghee, Saffron, Wine, Cheese).
-        3. "foundation": The pantry basics (Onions, Tomatoes, Ginger-Garlic, Oil, Spices like Turmeric/Chili/Cumin, Salt).
+        2. "soul": Flavor builders (Fresh Herbs, Whole Spices, Ghee, Saffron, Wine).
+        3. "foundation": The pantry basics (Onions, Tomatoes, Ginger-Garlic, Oil, Spices like Turmeric/Chili, Salt).
         
-        Return ONLY valid JSON.
+        Return ONLY valid JSON. Return the ingredients as simple Strings in a List.
         """
         
         try:
             time.sleep(0.5)
             response = model.generate_content(prompt)
-            st.session_state.raw_response = response.text # Save for debugging
+            st.session_state.raw_response = response.text 
             
-            # --- BULLETPROOF JSON CLEANER ---
-            # 1. Strip Markdown
+            # --- CLEANER ---
             text = response.text.replace("```json", "").replace("```", "").strip()
-            # 2. Find the JSON object using Regex (ignores extra chatty text)
             match = re.search(r'\{.*\}', text, re.DOTALL)
             if match:
                 clean_json = match.group(0)
                 data = json.loads(clean_json)
                 
-                # 3. Normalize Keys (Handle Case Sensitivity)
+                # Normalize keys to lowercase
                 normalized_data = {}
                 for k, v in data.items():
                     normalized_data[k.lower()] = v
@@ -111,7 +129,7 @@ if submitted and dish:
                 st.session_state.ingredients = normalized_data
                 status.update(label="Prep List Ready!", state="complete", expanded=False)
             else:
-                st.error("Could not find ingredient data. See Debug below.")
+                st.error("Parsing Error. See Debug.")
                 status.update(label="Error", state="error")
             
         except Exception as e:
@@ -122,10 +140,16 @@ if submitted and dish:
 if st.session_state.ingredients:
     data = st.session_state.ingredients
     
-    # Safe Getters (handle missing keys gracefully)
-    list_must = data.get('must_haves') or data.get('must_have') or []
-    list_soul = data.get('soul') or data.get('flavor') or []
-    list_foundation = data.get('foundation') or data.get('pantry') or []
+    # --- USE SMART EXTRACTOR ---
+    # This fixes the "meat vs Mutton" bug
+    raw_must = data.get('must_haves') or data.get('must_have')
+    list_must = extract_items(raw_must)
+    
+    raw_soul = data.get('soul') or data.get('flavor')
+    list_soul = extract_items(raw_soul)
+    
+    raw_foundation = data.get('foundation') or data.get('pantry')
+    list_foundation = extract_items(raw_foundation)
 
     st.divider()
     st.subheader(f"Inventory: {st.session_state.dish_name}")
@@ -136,15 +160,15 @@ if st.session_state.ingredients:
     with c1:
         st.info("🧱 **The Vitals**")
         if not list_must: st.write("*(No items found)*")
-        must_haves = [st.checkbox(i, True, key=f"m_{i}") for i in list_must]
+        must_haves = [st.checkbox(i, True, key=f"m_{idx}") for idx, i in enumerate(list_must)]
         
     with c2:
         st.warning("✨ **The Soul**")
         if not list_soul: st.write("*(No items found)*")
         soul_missing = []
         soul_available = []
-        for i in list_soul:
-            if st.checkbox(i, True, key=f"s_{i}"):
+        for idx, i in enumerate(list_soul):
+            if st.checkbox(i, True, key=f"s_{idx}"):
                 soul_available.append(i)
             else:
                 soul_missing.append(i)
@@ -154,8 +178,8 @@ if st.session_state.ingredients:
         if not list_foundation: st.write("*(No items found)*")
         pantry_missing = []
         pantry_available = []
-        for i in list_foundation:
-            if st.checkbox(i, True, key=f"p_{i}"):
+        for idx, i in enumerate(list_foundation):
+            if st.checkbox(i, True, key=f"p_{idx}"):
                 pantry_available.append(i)
             else:
                 pantry_missing.append(i)
@@ -181,7 +205,7 @@ if st.session_state.ingredients:
                     2. User is MISSING: {all_missing}.
                     
                     Structure:
-                    1. **The Strategy:** A quick opening note about how we will handle the missing items (if any).
+                    1. **The Strategy:** A quick opening note. If key flavor items are missing, explain the workaround.
                     2. **The Mise en Place:** List the exact ingredients to use.
                     3. **The Cook:** Step-by-step, descriptive instructions. Focus on sensory cues (smell, color).
                     4. **Chef's Tip:** One pro tip at the end.
@@ -211,10 +235,8 @@ if st.session_state.ingredients:
     else:
         st.error("🛑 You are missing a Vital Ingredient. We can't cook this dish without it.")
 
-# --- DEBUG SECTION (Only visible if something breaks) ---
+# --- DEBUG SECTION (Keep this in case we need it) ---
 with st.expander("🛠️ Debug Data (For Developer)"):
-    st.write("Raw Model Response:")
-    st.code(st.session_state.raw_response)
     if st.session_state.ingredients:
         st.write("Parsed Data:")
         st.json(st.session_state.ingredients)
