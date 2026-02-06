@@ -10,7 +10,7 @@ import urllib.parse
 import streamlit.components.v1 as components
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Sous v3.4", page_icon="🍳", layout="wide")
+st.set_page_config(page_title="Sous", page_icon="🍳", layout="wide")
 
 # --- 1. DESIGN SYSTEM ---
 st.markdown("""
@@ -87,26 +87,20 @@ model = get_working_model()
 # --- 4. HELPER FUNCTIONS ---
 
 def clean_list(raw_list):
-    """
-    Surgical Cleaner: Takes a specific list and removes junk.
-    Does NOT recurse blindly.
-    """
+    """Surgical Cleaner: Specific list cleaning only."""
     clean_items = []
     IGNORE_LIST = ["none", "null", "n/a", "undefined", "", "missing", "optional", "core", "character", "must_haves", "soul"]
     
     if isinstance(raw_list, list):
         for item in raw_list:
-            # Recursion only for nested lists, NOT dicts
             if isinstance(item, list):
                 clean_items.extend(clean_list(item))
             elif isinstance(item, str):
                 s = item.strip()
-                # Remove Markdown bullets if AI added them
                 s = s.replace("- ", "").replace("* ", "")
                 if len(s) > 2 and s.lower() not in IGNORE_LIST:
                     clean_items.append(s)
             elif isinstance(item, dict):
-                 # If AI gave objects like {"name": "Salt"}, try to grab values
                  clean_items.extend(clean_list(list(item.values())))
 
     return clean_items
@@ -178,7 +172,7 @@ if "toast_shown" not in st.session_state: st.session_state.toast_shown = False
 
 c_title, c_surprise = st.columns([4, 1])
 with c_title:
-    st.title("Sous v3.4")
+    st.title("Sous")
     st.caption("The adaptive kitchen co-pilot.")
 with c_surprise:
     st.write("") 
@@ -241,24 +235,20 @@ if st.session_state.ingredients:
         st.session_state.toast_shown = True
 
     data = st.session_state.ingredients
-    # Normalize keys to lowercase for matching
     data_lower = {k.lower(): v for k, v in data.items()}
-    
-    # --- SURGICAL EXTRACTION ---
-    # We look for specific keys. We do NOT pass the whole dict to the cleaner.
     
     # 1. Try to find Core
     raw_core = data_lower.get('core') or data_lower.get('must_haves') or []
     # 2. Try to find Character
     raw_char = data_lower.get('character') or data_lower.get('soul') or []
 
-    # 3. Fallback: If specific keys missing, grab by index (dangerous but necessary backup)
+    # 3. Fallback
     if not raw_core and not raw_char:
         all_lists = [v for v in data.values() if isinstance(v, list)]
         if len(all_lists) > 0: raw_core = all_lists[0]
         if len(all_lists) > 1: raw_char = all_lists[1]
     
-    # 4. Clean the lists
+    # 4. Clean lists
     list_core = clean_list(raw_core)
     list_character = clean_list(raw_char)
 
@@ -271,7 +261,10 @@ if st.session_state.ingredients:
         st.markdown("🧱 **The Core (Non-Negotiables)**")
         core_checks = [st.checkbox(str(i), True, key=f"c_{x}") for x, i in enumerate(list_core)]
     with c2:
-        st.markdown("✨ **The Character (Negotiable)**")
+        # UX IMPROVEMENT: NEW HEADER
+        st.markdown("✨ **Flavor & Substitutes**")
+        st.caption("*(Uncheck to get an alternative)*")
+        
         character_avail = [i for x, i in enumerate(list_character) if st.checkbox(str(i), True, key=f"ch_{x}")]
         character_missing = [i for i in list_character if i not in character_avail]
 
