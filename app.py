@@ -18,6 +18,16 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
+# --- HIDE STREAMLIT BRANDING ---
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
 # --- CRITICAL FIX: SWAP TO 1.5 FLASH ---
 # 1.5 Flash has much higher rate limits (1500/day) than the experimental 2.5 model.
 model = genai.GenerativeModel("models/gemini-1.5-flash") 
