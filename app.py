@@ -236,6 +236,7 @@ if st.session_state.ingredients:
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("🧱 **The Core (Non-Negotiables)**")
+        # FORCE STRING CAST (Fixes TypeError)
         core_checks = [st.checkbox(str(i), True, key=f"c_{x}") for x, i in enumerate(list_core)]
     with c2:
         st.markdown("✨ **The Character (Negotiable)**")
