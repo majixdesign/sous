@@ -1,8 +1,9 @@
 import streamlit as st
+import google.generativeai as genai
 import os
-from groq import Groq
 from dotenv import load_dotenv
 import json
+import time
 
 # --- HIDE STREAMLIT BRANDING ---
 st.set_page_config(page_title="Sous", page_icon="🍳", layout="centered")
@@ -18,20 +19,29 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 # 1. Configuration
 load_dotenv()
 
-try:
-    api_key = st.secrets["GROQ_API_KEY"]
-except:
-    api_key = os.getenv("GROQ_API_KEY")
-
+# Try to find the Google Key
+api_key = os.getenv("GOOGLE_API_KEY")
 if not api_key:
-    st.error("🔑 GROQ_API_KEY missing. Please add it to Secrets.")
-    st.stop()
+    try:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+    except:
+        st.error("🔑 Google API Key missing. Please check your Secrets.")
+        st.stop()
 
-client = Groq(api_key=api_key)
+genai.configure(api_key=api_key)
+
+# --- MODEL SETUP ---
+# Since you have Billing enabled, we strictly use 1.5 Flash.
+# It is the most reliable, cheapest, and highest-limit model.
+try:
+    model = genai.GenerativeModel("models/gemini-1.5-flash")
+except:
+    # Fallback just in case
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
 # 2. Header
 st.title("Sous 🍳")
-st.caption("Your smart kitchen co-pilot. (Gourmet Mode)")
+st.caption("Your smart kitchen co-pilot. (Powered by Gemini)")
 
 # 3. Input
 with st.form("input_form"):
@@ -53,36 +63,33 @@ if submitted and dish:
     st.session_state.recipe_text = None
     st.session_state.generated_recipe = False
     
-    with st.status("👨‍🍳 Sous is analyzing the recipe...", expanded=True) as status:
-        st.write("Checking culinary requirements...")
+    with st.status("👨‍🍳 Sous is analyzing the dish...", expanded=True) as status:
         
+        # LOGIC PROMPT
         prompt = f"""
-        I want to cook {dish} for {servings} people.
-        Return ONLY a JSON object with these 3 keys:
+        I want to cook {dish} for {servings} people. 
+        Break down the ingredients into a JSON object with these 3 keys:
         
-        1. 'heroes': List 3-4 CORE ingredients that define the dish (e.g., The main meat, the specific rice, the main vegetable).
-        2. 'variables': List 5-6 SECONDARY ingredients that add flavor but might be missing in a home kitchen (e.g., Fresh herbs like Mint/Coriander, specific spices like Saffron/Star Anise, specialty dairy like Ghee/Cream). DO NOT list alternative meats here.
-        3. 'pantry': List basic items assumed to be in stock (Oil, Salt, Water, Onions, Ginger-Garlic paste, Chili powder, Turmeric, Cumin).
+        1. 'heroes': List 3-4 CORE ingredients (e.g. Meat, Main Veg, Special Rice).
+        2. 'variables': List 5-6 SECONDARY flavor ingredients (Herbs, Spices, Dairy). DO NOT list alternative meats here.
+        3. 'pantry': List basic items (Oil, Salt, Water, Onions, Ginger-Garlic Paste, Chili Powder, Turmeric).
+        
+        Return ONLY valid JSON.
         """
         
         try:
-            completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {"role": "system", "content": "You are an expert chef. You understand traditional recipes accurately. Output JSON only."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                response_format={"type": "json_object"}
-            )
-            
-            data = json.loads(completion.choices[0].message.content)
+            # We can be faster now, but a tiny sleep is still polite
+            time.sleep(0.5) 
+            response = model.generate_content(prompt)
+            cleaned = response.text.replace("```json", "").replace("```", "").strip()
+            data = json.loads(cleaned)
             st.session_state.ingredients = data
-            status.update(label="Ingredients Ready!", state="complete", expanded=False)
+            status.update(label="Ingredients Found!", state="complete", expanded=False)
             
         except Exception as e:
-            status.update(label="Error", state="error")
-            st.error(f"Groq Error: {e}")
+            status.update(label="Connection Error", state="error")
+            st.error(f"Error: {e}")
+            st.info("Check if your API Key is linked to the Billing Project in Google AI Studio.")
 
 # 5. Output
 if st.session_state.ingredients:
@@ -90,13 +97,12 @@ if st.session_state.ingredients:
     st.divider()
     st.subheader(f"Inventory: {st.session_state.dish_name}")
     
-    c1, c2 = st.columns(2)
-    with c1:
+    col_heroes, col_vars = st.columns(2)
+    with col_heroes:
         st.info("🛡️ **Heroes** (The Core)")
         heroes = [st.checkbox(i, True, key=f"h_{i}") for i in data.get('heroes', [])]
-    with c2:
+    with col_vars:
         st.warning("🎨 **Flavor Builders** (Check what you have)")
-        # Logic: Unchecked means MISSING
         missing = []
         available_vars = []
         for i in data.get('variables', []):
@@ -112,55 +118,41 @@ if st.session_state.ingredients:
             
         if st.session_state.get("generated_recipe"):
             if "recipe_text" not in st.session_state or gen_btn:
-                with st.spinner("👨‍🍳 Chef is writing detailed instructions..."):
+                with st.spinner("👨‍🍳 Chef is cooking up the plan..."):
                     
-                    # --- THE FIX: Pass the CONFIRMED list ---
+                    # Context Passing (The "Bug Fix" we learned earlier)
                     confirmed_list = data.get('heroes', []) + data.get('pantry', []) + available_vars
                     
-                    system_persona = """
-                    You are 'Sous', a warm, encouraging, expert home chef.
-                    Your recipes are authentic and mouth-watering.
-                    Do NOT be robotic. Use bolding for ingredients and steps.
-                    """
-                    
-                    user_request = f"""
+                    final_prompt = f"""
+                    Act as 'Sous', a warm, encouraging, Michelin-star home chef.
                     Create a recipe for {st.session_state.dish_name} ({servings} servings).
                     
-                    CRITICAL INVENTORY CONTEXT:
-                    1. The User HAS these ingredients: {confirmed_list}. USE THEM EXACTLY (e.g., if 'Ginger-Garlic Paste' is listed, do not ask for chopped ginger).
-                    2. The User is MISSING: {missing}.
+                    CRITICAL INVENTORY:
+                    1. User HAS: {confirmed_list}. USE THESE EXACTLY.
+                    2. User is MISSING: {missing}.
                     
                     Structure:
-                    1. **The Fix:** Briefly explain how we adapt to the missing items.
-                    2. **The Ingredients:** List the full shopping list (Heroes + Pantry + Available Variables).
-                    3. **The Recipe:** Step-by-step, engaging instructions.
+                    1. **The Fix:** Reassure the user about the missing items (e.g. "No Mint? We'll rely on the coriander...").
+                    2. **The Recipe:** Step-by-step, descriptive, mouth-watering instructions. Bold the ingredients.
                     """
-                    
                     try:
-                        resp = client.chat.completions.create(
-                            model="llama-3.3-70b-versatile",
-                            messages=[
-                                {"role": "system", "content": system_persona},
-                                {"role": "user", "content": user_request}
-                            ],
-                            temperature=0.7 
-                        )
-                        st.session_state.recipe_text = resp.choices[0].message.content
+                        resp = model.generate_content(final_prompt)
+                        st.session_state.recipe_text = resp.text
                     except Exception as e:
                         st.error(f"Error: {e}")
 
             st.markdown("---")
-            if missing: st.success(f"💡 **Kitchen Adaptation:** {', '.join(missing)}")
+            if missing: st.success(f"💡 **Adaptations:** {', '.join(missing)}")
             if st.session_state.recipe_text:
                 st.markdown(st.session_state.recipe_text)
                 st.markdown("---")
-                c_copy, c_reset = st.columns(2)
-                with c_copy:
-                    with st.expander("📋 Copy Recipe"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    with st.expander("📋 Copy"):
                         st.code(st.session_state.recipe_text, language="markdown")
-                with c_reset:
-                    if st.button("🔄 Start Over", use_container_width=True):
+                with c2:
+                    if st.button("🔄 Reset", use_container_width=True):
                         st.session_state.clear()
                         st.rerun()
     else:
-        st.error("🛑 Need Heroes!")
+        st.error("🛑 Need Heroes!") 
