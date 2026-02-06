@@ -50,22 +50,43 @@ def get_working_model():
 
 model = get_working_model()
 
-# --- HELPER: SMART LIST EXTRACTOR ---
-def extract_items(data_section):
-    if not data_section: return []
-    if isinstance(data_section, list): return data_section
-    if isinstance(data_section, dict): return list(data_section.values())
-    return []
+# --- HELPER: THE NUCLEAR SANITIZER ---
+def extract_items(data):
+    """
+    Recursively finds strings in any mess of JSON (Dicts, Lists, Objects).
+    Returns a clean, flat list of strings. Crash-proof.
+    """
+    items = []
+    
+    if isinstance(data, dict):
+        # If it's a dict, grab all values and dig deeper
+        for v in data.values():
+            items.extend(extract_items(v))
+            
+    elif isinstance(data, list):
+        # If it's a list, dig into each item
+        for item in data:
+            items.extend(extract_items(item))
+            
+    elif isinstance(data, str):
+        # Found a string! Keep it.
+        items.append(data)
+        
+    elif data is not None:
+        # Numbers/Booleans -> Convert to string
+        items.append(str(data))
+        
+    return items
 
 # 2. Header
-st.title("Sous 🍳")
+st.title("Sous 🍳 v3.0")
 st.caption("Your smart kitchen co-pilot. (Powered by Gemini)")
 
 # 3. Input
 with st.form("input_form"):
     col1, col2 = st.columns([3, 1])
     with col1:
-        dish = st.text_input("What are we cooking?", placeholder="e.g. Carbonara, Pancakes, Biryani...", label_visibility="collapsed")
+        dish = st.text_input("What are we cooking?", placeholder="e.g. Pancakes, Carbonara...", label_visibility="collapsed")
     with col2:
         servings = st.slider("Servings", 1, 8, 2)
     submitted = st.form_submit_button("Start Prep", use_container_width=True)
@@ -84,8 +105,7 @@ if submitted and dish:
     
     with st.status("👨‍🍳 Sous is organizing the kitchen...", expanded=True) as status:
         
-        # --- FIX: UNIVERSAL DEFINITIONS ---
-        # Removed hardcoded "Ginger/Garlic" to allow for Western/Baking dishes
+        # UNIVERSAL PROMPT
         prompt = f"""
         I want to cook {dish} for {servings} people. 
         If generic, assume the most authentic version.
@@ -98,7 +118,7 @@ if submitted and dish:
         2. "soul": Flavor builders (Fresh Herbs, Cheese, Wine, Fresh Chilies, Cream, Ghee).
         3. "foundation": Shelf-stable seasonings (Dried Spices, Sauces like Soy/Fish Sauce, Vinegars, Sugar, Baking Powder).
         
-        Return ONLY valid JSON. Return the ingredients as simple Strings in a List.
+        Return ONLY valid JSON. Return simple strings for ingredients (e.g., "Flour", "Eggs").
         """
         
         try:
@@ -112,6 +132,7 @@ if submitted and dish:
                 clean_json = match.group(0)
                 data = json.loads(clean_json)
                 
+                # Normalize keys
                 normalized_data = {}
                 for k, v in data.items():
                     normalized_data[k.lower()] = v
@@ -130,6 +151,7 @@ if submitted and dish:
 if st.session_state.ingredients:
     data = st.session_state.ingredients
     
+    # Use the NUCLEAR SANITIZER
     raw_must = data.get('must_haves') or data.get('must_have')
     list_must = extract_items(raw_must)
     
@@ -148,7 +170,8 @@ if st.session_state.ingredients:
     with c1:
         st.error("🧱 **The Non-Negotiables**")
         if not list_must: st.write("*(No items found)*")
-        must_haves = [st.checkbox(i, True, key=f"m_{idx}") for idx, i in enumerate(list_must)]
+        # Ensure 'i' is string to avoid TypeError
+        must_haves = [st.checkbox(str(i), True, key=f"m_{idx}") for idx, i in enumerate(list_must)]
         
     with c2:
         st.warning("✨ **The Soul**")
@@ -156,7 +179,7 @@ if st.session_state.ingredients:
         soul_missing = []
         soul_available = []
         for idx, i in enumerate(list_soul):
-            if st.checkbox(i, True, key=f"s_{idx}"):
+            if st.checkbox(str(i), True, key=f"s_{idx}"):
                 soul_available.append(i)
             else:
                 soul_missing.append(i)
@@ -167,7 +190,7 @@ if st.session_state.ingredients:
         pantry_missing = []
         pantry_available = []
         for idx, i in enumerate(list_foundation):
-            if st.checkbox(i, True, key=f"p_{idx}"):
+            if st.checkbox(str(i), True, key=f"p_{idx}"):
                 pantry_available.append(i)
             else:
                 pantry_missing.append(i)
