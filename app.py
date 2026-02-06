@@ -1,152 +1,137 @@
-import json
-import os
-
-import google.generativeai as genai
 import streamlit as st
+import google.generativeai as genai
+import os
 from dotenv import load_dotenv
+import json
 
+# 1. Configuration
+load_dotenv()
+api_key = os.getenv("GOOGLE_API_KEY")
 
-def configure_genai():
-    # Load environment variables from .env
-    load_dotenv()
-    api_key = os.getenv("GOOGLE_API_KEY")
+# Configure page settings - "Sous" branding
+st.set_page_config(page_title="Sous", page_icon="🍳", layout="centered")
 
-    if not api_key:
-        raise RuntimeError(
-            "GOOGLE_API_KEY is not set. Please update your .env file or environment."
+if not api_key:
+    st.error("🔑 API Key missing. Please check your .env file or Streamlit Secrets.")
+    st.stop()
+
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("models/gemini-flash-latest") # The "Toyota Corolla" model (Reliable)
+
+# 2. The Header (Clean & Modern)
+st.title("Sous 🍳")
+st.caption("Your smart kitchen co-pilot. I adapt recipes to what you actually have.")
+
+# 3. The "Intelligent Input" Section
+# We use st.form so the user can hit "Enter" on their keyboard!
+with st.form("input_form"):
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        dish = st.text_input(
+            "What are we cooking?", 
+            placeholder="e.g. Butter Chicken, Aglio Olio...",
+            label_visibility="collapsed"
         )
+    
+    with col2:
+        servings = st.slider("Servings", min_value=1, max_value=8, value=2)
+        
+    # This button submits the form
+    submitted = st.form_submit_button("Let's Cook", use_container_width=True)
 
-    genai.configure(api_key=api_key)
+# Initialize session state to keep data alive after clicking buttons
+if "ingredients" not in st.session_state:
+    st.session_state.ingredients = None
+if "dish_name" not in st.session_state:
+    st.session_state.dish_name = ""
 
-
-def parse_json_response(text: str):
-    """
-    Parse the model's response as JSON.
-    Tries to be robust to accidental code fences.
-    """
-    raw = text.strip()
-
-    # Handle ```json ... ``` or ``` ... ``` wrappers if present
-    if raw.startswith("```"):
-        # Remove leading ```json or ``` and trailing ```
-        raw = raw.strip("`")
-        # After stripping backticks, there may still be a language tag on the first line
-        lines = raw.splitlines()
-        if lines and lines[0].strip().lower().startswith("json"):
-            lines = lines[1:]
-        raw = "\n".join(lines).strip()
-
-    return json.loads(raw)
-
-
-def main():
-    st.set_page_config(page_title="ChefOS")
-
-    st.title("ChefOS")
-
-    dish = st.text_input("What do you want to cook?", value="", placeholder="Enter any dish here...")
-
-    analyze_clicked = st.button("Analyze")
-
-    if analyze_clicked:
-        if not dish.strip():
-            st.warning("Please enter a dish name before analyzing.")
-            return
-
+# 4. The Logic (Triggered by the Form)
+if submitted and dish:
+    st.session_state.dish_name = dish
+    
+    # The "Status" Log - Shows transparency
+    with st.status("👨‍🍳 Sous is analyzing...", expanded=True) as status:
+        st.write("Searching culinary database...")
+        
+        prompt = f"""
+        I want to cook {dish} for {servings} people. 
+        Break down the ingredients. 
+        Return ONLY a JSON object with these 3 keys: 
+        'heroes' (list of 3-4 absolute dealbreaker main ingredients), 
+        'variables' (list of 4-6 ingredients that affect flavor/texture but can be substituted), 
+        'pantry' (list of basic items like oil, salt, water, basic spices).
+        """
+        
         try:
-            configure_genai()
-            model = genai.GenerativeModel("models/gemini-flash-latest")
+            response = model.generate_content(prompt)
+            # Clean up JSON formatting if the AI adds backticks
+            cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
+            data = json.loads(cleaned_text)
+            st.session_state.ingredients = data
+            status.update(label="Ingredients Found!", state="complete", expanded=False)
+            
         except Exception as e:
-            st.error(f"Failed to configure AI: {e}")
-            return
+            status.update(label="Connection Error", state="error")
+            st.error(f"Oops: {e}")
 
-        prompt = (
-            f"I want to cook {dish.strip()}.\n"
-            "List the ingredients.\n"
-            "Return a JSON object with 3 keys:\n"
-            "  'heroes' (list of mandatory meats/veg),\n"
-            "  'variables' (list of swappable items like cream/ghee),\n"
-            "  'pantry' (list of basics like oil/salt).\n"
-            "Return ONLY JSON."
-        )
+# 5. The "Triage" Dashboard (Only shows if we have data)
+if st.session_state.ingredients:
+    data = st.session_state.ingredients
+    
+    st.divider()
+    st.subheader(f"Inventory Check: {st.session_state.dish_name}")
+    
+    # Layout: Two columns for cleaner UI
+    col_heroes, col_vars = st.columns(2)
+    
+    with col_heroes:
+        st.info("🛡️ **The Heroes** (Must Haves)")
+        # We assume heroes are present, but if unchecked, we block.
+        heroes_checks = []
+        for item in data['heroes']:
+            # Checked by default
+            is_checked = st.checkbox(item, value=True, key=f"h_{item}")
+            heroes_checks.append(is_checked)
+            
+    with col_vars:
+        st.warning("🎨 **The Variables** (Swappable)")
+        # We track what is UNCHECKED here
+        missing_vars = []
+        for item in data['variables']:
+            is_checked = st.checkbox(item, value=True, key=f"v_{item}")
+            if not is_checked:
+                missing_vars.append(item)
 
-        with st.spinner("ChefOS is thinking..."):
-            try:
-                response = model.generate_content(prompt)
-                ingredients = parse_json_response(response.text)
-            except Exception as e:
-                st.error(f"Failed to analyze dish: {e}")
-                return
-
-        # Persist ingredients and dish name so we can reuse them
-        st.session_state["ingredients"] = ingredients
-        st.session_state["dish_name"] = dish.strip()
-
-    ingredients = st.session_state.get("ingredients")
-    dish_name = st.session_state.get("dish_name", dish.strip())
-
-    if ingredients:
-        heroes = ingredients.get("heroes", [])
-        variables = ingredients.get("variables", [])
-        pantry = ingredients.get("pantry", [])
-
-        missing_heroes = []
-        missing_ingredients = []
-
-        # Heroes with hard stop if any are missing
-        if heroes:
-            st.subheader("Heroes")
-            for item in heroes:
-                checked = st.checkbox(item, value=True, key=f"hero_{item}")
-                if not checked:
-                    missing_heroes.append(item)
-
-        # Variables where we allow substitution
-        if variables:
-            st.subheader("Variables")
-            for item in variables:
-                checked = st.checkbox(item, value=True, key=f"variable_{item}")
-                if not checked:
-                    missing_ingredients.append(item)
-                    st.info(f"⚠️ Missing {item}? No problem, I'll find a substitute.")
-
-        if pantry:
-            with st.expander("Pantry Items (Assumed)"):
-                for item in pantry:
-                    st.checkbox(item, value=True, key=f"pantry_{item}")
-
-        # If any hero is missing, block recipe generation
-        if missing_heroes:
-            missing_str = ", ".join(missing_heroes)
-            st.error(f"🛑 You need {missing_str} to make this dish. We can't proceed.")
-            return
-
-        # Final recipe generation step (only when heroes are all present)
-        if st.button("Generate My Recipe"):
-            missing_str = ", ".join(missing_ingredients) if missing_ingredients else "none"
-
-            recipe_prompt = (
-                f"The user is making {dish_name} but is missing: {missing_str}.\n"
-                "Rewrite the recipe steps to compensate.\n"
-                "Example: If missing Cream, suggest using Cashew paste or Milk + Butter.\n"
-                "Structure the output as:\n"
-                "1. 'The Fix': Explain how we are swapping the missing item.\n"
-                "2. 'The Recipe': The full step-by-step instructions."
-            )
-
-            with st.spinner("ChefOS is writing your recipe..."):
-                try:
-                    configure_genai()
-                    recipe_model = genai.GenerativeModel("models/gemini-flash-latest")
-                    recipe_response = recipe_model.generate_content(recipe_prompt)
-                    recipe_text = getattr(recipe_response, "text", str(recipe_response))
-                except Exception as e:
-                    st.error(f"Failed to generate recipe: {e}")
-                    return
-
-            st.subheader("Your Customized Recipe")
-            st.markdown(recipe_text)
-
-
-if __name__ == "__main__":
-    main()
+    # 6. The "Action" Section
+    st.write("") # Spacer
+    
+    # Logic Gate: Are all heroes present?
+    if all(heroes_checks):
+        if st.button("Generate My Recipe", type="primary", use_container_width=True):
+            
+            with st.spinner("Writing your custom recipe..."):
+                final_prompt = f"""
+                Act as a professional chef named 'Sous'.
+                Create a recipe for {st.session_state.dish_name} (Servings: {servings}).
+                
+                CONSTRAINT: The user is MISSING these ingredients: {missing_vars}.
+                
+                1. If there are missing ingredients, you MUST explicitly list how you are fixing it in a "Chef's Note" at the top.
+                2. Then provide the full step-by-step recipe. 
+                3. Be concise and encouraging.
+                """
+                
+                recipe_response = model.generate_content(final_prompt)
+                
+                # Dynamic Output Display
+                st.markdown("---")
+                
+                # If they missed items, we highlight the "Fix"
+                if missing_vars:
+                    st.success(f"💡 **Adaptive Mode Active:** finding substitutes for {', '.join(missing_vars)}...")
+                
+                st.markdown(recipe_response.text)
+                
+    else:
+        st.error("🛑 Hold up! You are missing a 'Hero' ingredient. We can't make this dish without it.")
