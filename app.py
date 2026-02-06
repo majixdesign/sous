@@ -99,7 +99,27 @@ def extract_items(data):
             
     return items
 
-def generate_with_retry(prompt, retries=1):
+def smart_key_search(data, target_keywords):
+    """Fuzzy matching for keys."""
+    # 1. Exact or Contain match
+    for key, value in data.items():
+        if any(k in key.lower() for k in target_keywords):
+            return value
+    return None
+
+def fallback_extraction(data):
+    """Last Resort: Grab the first two lists found."""
+    found_lists = []
+    for val in data.values():
+        if isinstance(val, list):
+            found_lists.append(val)
+    
+    # Return found lists or empty placeholders
+    core = found_lists[0] if len(found_lists) > 0 else []
+    char = found_lists[1] if len(found_lists) > 1 else []
+    return core, char
+
+def generate_with_retry(prompt, retries=2):
     """Retries the AI call if JSON parsing fails."""
     for attempt in range(retries + 1):
         try:
@@ -207,7 +227,7 @@ if submitted or st.session_state.trigger_search:
             
             Output: JSON only. No "None" values.
             """
-            data = generate_with_retry(prompt)
+            data = generate_with_retry(prompt, retries=2)
             
             if data:
                 st.session_state.ingredients = data
@@ -223,8 +243,17 @@ if st.session_state.ingredients:
     data = st.session_state.ingredients
     data = {k.lower(): v for k, v in data.items()}
     
-    list_core = extract_items(data.get('core') or data.get('must_haves'))
-    list_character = extract_items(data.get('character') or data.get('soul'))
+    # --- INTELLIGENT PARSER V2.4 ---
+    # 1. Try Key Match
+    raw_core = smart_key_search(data, ["core", "must", "vital", "main", "structure"])
+    raw_char = smart_key_search(data, ["char", "soul", "flavor", "optional"])
+    
+    # 2. Fallback if keys are totally weird
+    if not raw_core:
+        raw_core, raw_char = fallback_extraction(data)
+        
+    list_core = extract_items(raw_core)
+    list_character = extract_items(raw_char)
 
     st.divider()
     st.subheader(f"Inventory: {st.session_state.dish_name}")
@@ -267,7 +296,7 @@ if st.session_state.ingredients:
                     "chef_tip": "A pro tip."
                 }}
                 """
-                r_data = generate_with_retry(final_prompt)
+                r_data = generate_with_retry(final_prompt, retries=2)
                 
                 if r_data:
                     st.session_state.recipe_data = r_data
@@ -293,11 +322,10 @@ if st.session_state.recipe_data:
     m2.metric("Cook Time", r['meta'].get('cook_time', '--'))
     m3.metric("Difficulty", r['meta'].get('difficulty', '--'))
     
-    # 2. PIVOT (Conditional Logic)
+    # 2. PIVOT
     pivot_msg = r.get('pivot_strategy', '')
     show_strategy = True
     
-    # Logic to HIDE strategy if pantry is full
     if not pivot_msg or "full pantry" in pivot_msg.lower() or "everything needed" in pivot_msg.lower() or "no missing" in pivot_msg.lower():
         show_strategy = False
 
@@ -327,8 +355,6 @@ if st.session_state.recipe_data:
     # 4. ACTION BAR
     st.write("")
     
-    # --- CONSTRUCT TEXT FOR SHARING ---
-    # Smart logic: If strategy is hidden, don't include it in text
     share_text = f"🥘 {st.session_state.dish_name}\n\n"
     if show_strategy:
         share_text += f"💡 STRATEGY: {pivot_msg}\n\n"
@@ -341,10 +367,8 @@ if st.session_state.recipe_data:
     
     share_text += f"\n✨ Chef's Secret: {r.get('chef_tip', '')}"
     
-    # --- BUTTONS ---
     a1, a2 = st.columns(2)
     with a1:
-        # Full Recipe for WhatsApp
         encoded_wa = urllib.parse.quote(share_text)
         st.link_button("💬 Share Recipe on WhatsApp", f"https://wa.me/?text={encoded_wa}", use_container_width=True)
         
