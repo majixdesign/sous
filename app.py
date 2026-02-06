@@ -1,4 +1,3 @@
-# Force Update: Dynamic Model Selector
 import streamlit as st
 import google.generativeai as genai
 import os
@@ -64,7 +63,7 @@ def extract_items(data_section):
         return data_section
         
     if isinstance(data_section, dict):
-        # If it's a dict (like in your screenshot), we want the VALUES ("Mutton 500g"), not the keys ("meat").
+        # If it's a dict (e.g. "meat": "Mutton 500g"), return the VALUES.
         return list(data_section.values())
         
     return []
@@ -96,7 +95,6 @@ if submitted and dish:
     
     with st.status("👨‍🍳 Sous is organizing the kitchen...", expanded=True) as status:
         
-        # PROMPT: We ask for lists, but the code below now handles dicts too if it disobeys.
         prompt = f"""
         I want to cook {dish} for {servings} people. 
         If generic (like "Biryani"), assume the most authentic version (e.g. Mutton/Chicken) but include "Main Protein" in the ingredient name.
@@ -141,7 +139,6 @@ if st.session_state.ingredients:
     data = st.session_state.ingredients
     
     # --- USE SMART EXTRACTOR ---
-    # This fixes the "meat vs Mutton" bug
     raw_must = data.get('must_haves') or data.get('must_have')
     list_must = extract_items(raw_must)
     
@@ -223,10 +220,11 @@ if st.session_state.ingredients:
                 st.markdown(st.session_state.recipe_text)
                 st.markdown("---")
                 col_copy, col_reset = st.columns(2)
-                with c_copy:
+                # FIXED TYPO HERE (was c_copy)
+                with col_copy:
                     with st.expander("📋 Copy Recipe"):
                         st.code(st.session_state.recipe_text, language="markdown")
-                with c_reset:
+                with col_reset:
                     if st.button("🔄 Start Over", use_container_width=True):
                         st.session_state.clear()
                         st.rerun()
@@ -235,7 +233,7 @@ if st.session_state.ingredients:
     else:
         st.error("🛑 You are missing a Vital Ingredient. We can't cook this dish without it.")
 
-# --- DEBUG SECTION (Keep this in case we need it) ---
+# --- DEBUG SECTION (Keep until stable) ---
 with st.expander("🛠️ Debug Data (For Developer)"):
     if st.session_state.ingredients:
         st.write("Parsed Data:")
