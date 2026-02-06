@@ -29,45 +29,16 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# --- THE SELF-HEALING MODEL SELECTOR ---
-def get_working_model():
-    """Finds the first available model that actually works."""
-    # Preferred order of models to try
-    preferred_models = [
-        "models/gemini-1.5-flash",
-        "models/gemini-1.5-flash-001",
-        "models/gemini-1.5-flash-002",
-        "models/gemini-1.5-flash-8b",
-        "models/gemini-pro",
-        "models/gemini-1.0-pro"
-    ]
-    
-    # Check what is actually available in your account
-    try:
-        available = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    except:
-        # Fallback if listing fails
-        return genai.GenerativeModel("models/gemini-1.5-flash")
-
-    # Try to find a match
-    for preferred in preferred_models:
-        if preferred in available:
-            return genai.GenerativeModel(preferred)
-    
-    # If none of our preferred ones are there, take the first valid one (avoiding 2.0 experimental if possible)
-    # But if 2.0 is all you have, we take it.
-    if available:
-        return genai.GenerativeModel(available[0])
-        
-    return genai.GenerativeModel("models/gemini-1.5-flash") # Hail Mary
-
-model = get_working_model()
+# --- STRICTLY FORCE THE HIGH-QUOTA MODEL ---
+# We are ignoring 2.0 and 2.5 because they have tiny limits (20/day).
+# We use 1.5-flash because it allows 1,500/day.
+model = genai.GenerativeModel("models/gemini-1.5-flash")
 
 # 2. The Header
 st.title("Sous 🍳")
 st.caption("Your smart kitchen co-pilot. I adapt recipes to what you actually have.")
 
-# 3. The Input
+# 3. Input
 with st.form("input_form"):
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -76,7 +47,6 @@ with st.form("input_form"):
         servings = st.slider("Servings", 1, 8, 2)
     submitted = st.form_submit_button("Let's Cook", use_container_width=True)
 
-# Session State
 if "ingredients" not in st.session_state: st.session_state.ingredients = None
 if "dish_name" not in st.session_state: st.session_state.dish_name = ""
 if "generated_recipe" not in st.session_state: st.session_state.generated_recipe = False
@@ -99,7 +69,7 @@ if submitted and dish:
         'pantry' (list of basic items like oil, salt, water, basic spices).
         """
         try:
-            time.sleep(1) # Safety pause
+            time.sleep(2) # Safety pause
             response = model.generate_content(prompt)
             cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
             data = json.loads(cleaned_text)
@@ -107,10 +77,10 @@ if submitted and dish:
             status.update(label="Ingredients Found!", state="complete", expanded=False)
         except Exception as e:
             status.update(label="Connection Error", state="error")
-            st.error(f"Oops: {e}")
-            st.info("Tip: If you see a 404/429 error, just wait 30 seconds and try again.")
+            st.error(f"Error: {e}")
+            st.info("If this says '404', wait 1 minute. If it says '429', we are hitting speed limits.")
 
-# 5. Triage & Output
+# 5. Output
 if st.session_state.ingredients:
     data = st.session_state.ingredients
     st.divider()
