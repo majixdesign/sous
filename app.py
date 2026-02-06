@@ -30,7 +30,7 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 
 # --- CRITICAL FIX: SWAP TO 1.5 FLASH ---
 # 1.5 Flash has much higher rate limits (1500/day) than the experimental 2.5 model.
-model = genai.GenerativeModel("models/gemini-1.5-flash") 
+model = genai.GenerativeModel("gemini-pro")
 
 # 2. The Header
 st.title("Sous 🍳")
