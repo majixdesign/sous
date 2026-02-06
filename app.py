@@ -18,7 +18,6 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 # 1. Configuration
 load_dotenv()
 
-# Fetch API Key (Local or Cloud)
 try:
     api_key = st.secrets["GROQ_API_KEY"]
 except:
@@ -32,7 +31,7 @@ client = Groq(api_key=api_key)
 
 # 2. Header
 st.title("Sous 🍳")
-st.caption("Your smart kitchen co-pilot. Powered by Llama 3 (Groq).")
+st.caption("Your smart kitchen co-pilot. (Gourmet Mode)")
 
 # 3. Input
 with st.form("input_form"):
@@ -47,16 +46,17 @@ if "ingredients" not in st.session_state: st.session_state.ingredients = None
 if "dish_name" not in st.session_state: st.session_state.dish_name = ""
 if "generated_recipe" not in st.session_state: st.session_state.generated_recipe = False
 
-# 4. Logic (The Fast Part)
+# 4. Logic
 if submitted and dish:
     st.session_state.dish_name = dish
     st.session_state.ingredients = None
     st.session_state.recipe_text = None
     st.session_state.generated_recipe = False
     
-    with st.status("⚡ Sous is thinking...", expanded=True) as status:
-        st.write("Analyzing ingredients...")
+    with st.status("👨‍🍳 Sous is planning the menu...", expanded=True) as status:
+        st.write("Checking pantry...")
         
+        # LOGIC PROMPT (Strict JSON)
         prompt = f"""
         Recipe: {dish} for {servings} people.
         Return JSON with keys: 
@@ -73,12 +73,12 @@ if submitted and dish:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                response_format={"type": "json_object"} # <--- This makes it unbreakable
+                response_format={"type": "json_object"}
             )
             
             data = json.loads(completion.choices[0].message.content)
             st.session_state.ingredients = data
-            status.update(label="Ready!", state="complete", expanded=False)
+            status.update(label="Ingredients Ready!", state="complete", expanded=False)
             
         except Exception as e:
             status.update(label="Error", state="error")
@@ -100,34 +100,58 @@ if st.session_state.ingredients:
 
     st.write("") 
     if all(heroes):
-        gen_btn = st.button("Generate Recipe", type="primary", use_container_width=True)
+        gen_btn = st.button("Generate Chef's Recipe", type="primary", use_container_width=True)
         if gen_btn: st.session_state.generated_recipe = True
             
         if st.session_state.get("generated_recipe"):
             if "recipe_text" not in st.session_state or gen_btn:
-                with st.spinner("Writing..."):
-                    fix_prompt = f"User is missing: {missing}. Explain fixes first, then full recipe for {st.session_state.dish_name}."
+                with st.spinner("👨‍🍳 Chef is writing detailed instructions..."):
+                    
+                    # --- THE QUALITY FIX ---
+                    # We inject a specific "Persona" to make it write better.
+                    
+                    system_persona = """
+                    You are 'Sous', a warm, encouraging, Michelin-star home chef.
+                    Your recipes are descriptive, mouth-watering, and easy to follow.
+                    Do NOT be robotic. Use bolding for ingredients and steps. 
+                    Add a 'Chef's Tip' at the end.
+                    """
+                    
+                    user_request = f"""
+                    Create a recipe for {st.session_state.dish_name} ({servings} servings).
+                    
+                    CRITICAL CONTEXT:
+                    The user is MISSING these ingredients: {missing}.
+                    
+                    Structure:
+                    1. **The Fix:** Start by reassuring the user about the missing items and how we will substitute them (or why we don't need them).
+                    2. **The Recipe:** Step-by-step, engaging instructions.
+                    """
+                    
                     try:
                         resp = client.chat.completions.create(
                             model="llama-3.3-70b-versatile",
-                            messages=[{"role": "user", "content": fix_prompt}],
-                            temperature=0.6
+                            messages=[
+                                {"role": "system", "content": system_persona},
+                                {"role": "user", "content": user_request}
+                            ],
+                            temperature=0.7 # Increased creativity
                         )
                         st.session_state.recipe_text = resp.choices[0].message.content
                     except Exception as e:
                         st.error(f"Error: {e}")
 
             st.markdown("---")
-            if missing: st.success(f"💡 **Substitutes:** {', '.join(missing)}")
+            if missing: st.success(f"💡 **Kitchen Adaptation:** {', '.join(missing)}")
             if st.session_state.recipe_text:
                 st.markdown(st.session_state.recipe_text)
                 st.markdown("---")
                 c_copy, c_reset = st.columns(2)
                 with c_copy:
-                    with st.expander("📋 Copy"):
+                    with st.expander("📋 Copy Recipe"):
                         st.code(st.session_state.recipe_text, language="markdown")
                 with c_reset:
-                    if st.button("🔄 Reset", use_container_width=True):
+                    if st.button("🔄 Start Over", use_container_width=True):
                         st.session_state.clear()
                         st.rerun()
     else:
