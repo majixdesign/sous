@@ -184,7 +184,7 @@ def speak_text_button(text):
             synth.cancel();
         }}
         </script>
-        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
             <button onclick="play()" style="
                 flex: 1; background-color: #ffffff; border: 1px solid #000; border-radius: 8px; 
                 padding: 8px 15px; font-family: 'Archivo', sans-serif; font-size: 13px; 
@@ -199,7 +199,7 @@ def speak_text_button(text):
             </button>
         </div>
         """,
-        height=45
+        height=60
     )
 
 GLOBAL_DISHES = [
@@ -392,28 +392,26 @@ if st.session_state.recipe_data:
                 
     with c_step:
         with st.container(border=True):
-            # HEADER + AUDIO BUTTON
+            # HEADER
             st.markdown("**🔥 Instructions**")
-            
-            # COMPILE TEXT FOR SPEECH (Aggressive Clean)
-            speech_text = f"Recipe for {st.session_state.dish_name}. "
-            if show_strategy: speech_text += f"Strategy: {pivot_msg}. "
-            speech_text += "Instructions: "
-            for s in r.get('steps', []):
-                # Clean numbers for speech too
-                clean = re.sub(r'^[\d\.\s\*\-]+', '', s)
-                speech_text += f"{clean}. "
-                
-            speak_text_button(speech_text)
             
             # STEPS (Numbering Fix: Aggressive Regex)
             for idx, step in enumerate(r.get('steps', [])):
-                # This regex strips leading digits, dots, spaces, bullets, and dashes
                 clean_step = re.sub(r'^[\d\.\s\*\-]+', '', step)
                 st.markdown(f"**{idx+1}.** {clean_step}")
             
             st.markdown("---")
             st.caption(f"✨ **Chef's Secret:** {r.get('chef_tip', '')}")
+            
+            # AUDIO CONTROLS (Moved to Bottom)
+            speech_text = f"Recipe for {st.session_state.dish_name}. "
+            if show_strategy: speech_text += f"Strategy: {pivot_msg}. "
+            speech_text += "Instructions: "
+            for s in r.get('steps', []):
+                clean = re.sub(r'^[\d\.\s\*\-]+', '', s)
+                speech_text += f"{clean}. "
+                
+            speak_text_button(speech_text)
 
     # 4. ACTION BAR
     st.write("")
