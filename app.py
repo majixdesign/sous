@@ -65,7 +65,7 @@ st.caption("Your smart kitchen co-pilot. (Powered by Gemini)")
 with st.form("input_form"):
     col1, col2 = st.columns([3, 1])
     with col1:
-        dish = st.text_input("What are we cooking?", placeholder="e.g. Mutton Biryani...", label_visibility="collapsed")
+        dish = st.text_input("What are we cooking?", placeholder="e.g. Carbonara, Pancakes, Biryani...", label_visibility="collapsed")
     with col2:
         servings = st.slider("Servings", 1, 8, 2)
     submitted = st.form_submit_button("Start Prep", use_container_width=True)
@@ -84,15 +84,19 @@ if submitted and dish:
     
     with st.status("👨‍🍳 Sous is organizing the kitchen...", expanded=True) as status:
         
-        # --- FIX 1: Redefining "Vitals" to include Aromatics ---
+        # --- FIX: UNIVERSAL DEFINITIONS ---
+        # Removed hardcoded "Ginger/Garlic" to allow for Western/Baking dishes
         prompt = f"""
         I want to cook {dish} for {servings} people. 
-        If generic (like "Biryani"), assume the most authentic version but include "Main Protein" in the ingredient name.
+        If generic, assume the most authentic version.
         
         Break down ingredients into a JSON object with these 3 keys:
-        1. "must_haves": The absolute CORE items. This MUST include the Meat/Veg, Rice/Pasta, AND key aromatics like Onions, Ginger, Garlic.
-        2. "soul": Flavor builders (Fresh Herbs, Whole Spices, Ghee, Saffron, Wine, Cheese).
-        3. "foundation": The pantry basics (Oil, Powdered Spices like Turmeric/Chili, Salt, Water).
+        1. "must_haves": The Non-Negotiables. This MUST include:
+           - The Heroes (Main Protein, Main Carb, Main Veg)
+           - The Structural Essentials (Cooking Fat/Oil, Water, Salt)
+           - Critical Bases (e.g., Onions for Curry, Flour/Eggs for Baking, Stock for Soup)
+        2. "soul": Flavor builders (Fresh Herbs, Cheese, Wine, Fresh Chilies, Cream, Ghee).
+        3. "foundation": Shelf-stable seasonings (Dried Spices, Sauces like Soy/Fish Sauce, Vinegars, Sugar, Baking Powder).
         
         Return ONLY valid JSON. Return the ingredients as simple Strings in a List.
         """
@@ -142,7 +146,7 @@ if st.session_state.ingredients:
     c1, c2, c3 = st.columns(3)
     
     with c1:
-        st.info("🧱 **The Vitals**")
+        st.error("🧱 **The Non-Negotiables**")
         if not list_must: st.write("*(No items found)*")
         must_haves = [st.checkbox(i, True, key=f"m_{idx}") for idx, i in enumerate(list_must)]
         
@@ -158,7 +162,7 @@ if st.session_state.ingredients:
                 soul_missing.append(i)
                 
     with c3:
-        st.success("🏗️ **The Foundation**")
+        st.info("🏗️ **The Pantry**")
         if not list_foundation: st.write("*(No items found)*")
         pantry_missing = []
         pantry_available = []
@@ -169,9 +173,9 @@ if st.session_state.ingredients:
                 pantry_missing.append(i)
 
     st.write("") 
+    
     if all(must_haves) and list_must:
         
-        # Calculate Missing Items HERE (Global Scope)
         all_missing = soul_missing + pantry_missing
         confirmed_inventory = list_must + soul_available + pantry_available
         
@@ -182,7 +186,6 @@ if st.session_state.ingredients:
             if "recipe_text" not in st.session_state or gen_btn:
                 with st.spinner("👨‍🍳 Chef is planning the strategy..."):
                     
-                    # --- FIX 2: STRICTER PROMPT ---
                     final_prompt = f"""
                     Act as 'Sous', a warm, expert home chef.
                     Create a recipe for {st.session_state.dish_name} ({servings} servings).
@@ -193,10 +196,9 @@ if st.session_state.ingredients:
                     
                     STRICT CONSTRAINT: 
                     If an ingredient is listed as MISSING, do NOT list it in the "Ingredients" section. 
-                    If it is vital (like Salt), mention in the steps that it is omitted or substituted, but do NOT put it in the shopping list.
                     
                     Structure:
-                    1. **The Strategy:** A quick opening note. If items are missing (like Salt/Spices), explain the workaround or the compromise.
+                    1. **The Strategy:** A quick opening note. If flavor items are missing, explain the workaround.
                     2. **The Mise en Place:** List ONLY the confirmed ingredients.
                     3. **The Cook:** Step-by-step instructions using ONLY what we have.
                     4. **Chef's Tip:** One pro tip at the end.
@@ -225,7 +227,7 @@ if st.session_state.ingredients:
     elif not list_must:
         st.error("⚠️ Data Error: The AI didn't return any ingredients. Please try again.")
     else:
-        st.error("🛑 You are missing a Vital Ingredient. We can't cook this dish without it.")
+        st.error("🛑 You are missing a Non-Negotiable Item. We cannot cook this dish safely without it.")
 
 # --- DEBUG SECTION ---
 with st.expander("🛠️ Debug Data (For Developer)"):
