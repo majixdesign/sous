@@ -10,7 +10,7 @@ import urllib.parse
 import streamlit.components.v1 as components
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="Sous", page_icon="🍳", layout="wide")
+st.set_page_config(page_title="Sous v3.0", page_icon="🍳", layout="wide")
 
 # --- 1. DESIGN SYSTEM ---
 st.markdown("""
@@ -152,7 +152,8 @@ if "toast_shown" not in st.session_state: st.session_state.toast_shown = False
 
 c_title, c_surprise = st.columns([4, 1])
 with c_title:
-    st.title("Sous")
+    # UPDATED TITLE TO VERIFY DEPLOYMENT
+    st.title("Sous v3.0 (Fixed)")
     st.caption("The adaptive kitchen co-pilot.")
 with c_surprise:
     st.write("") 
@@ -236,7 +237,7 @@ if st.session_state.ingredients:
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("🧱 **The Core (Non-Negotiables)**")
-        # FORCE STRING CAST (Fixes TypeError)
+        # FORCE STRING CAST (Fixes TypeError from Screenshot)
         core_checks = [st.checkbox(str(i), True, key=f"c_{x}") for x, i in enumerate(list_core)]
     with c2:
         st.markdown("✨ **The Character (Negotiable)**")
