@@ -3,6 +3,7 @@ import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 import json
+import time  # <--- Added this library for the "Sleep" function
 
 # 1. Configuration
 load_dotenv()
@@ -16,14 +17,16 @@ if not api_key:
     st.stop()
 
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel("models/gemini-flash-latest") # The "Toyota Corolla" model (Reliable)
 
-# 2. The Header (Clean & Modern)
+# --- CRITICAL FIX: SWAP TO 1.5 FLASH ---
+# 1.5 Flash has much higher rate limits (1500/day) than the experimental 2.5 model.
+model = genai.GenerativeModel("models/gemini-1.5-flash") 
+
+# 2. The Header
 st.title("Sous 🍳")
 st.caption("Your smart kitchen co-pilot. I adapt recipes to what you actually have.")
 
 # 3. The "Intelligent Input" Section
-# We use st.form so the user can hit "Enter" on their keyboard!
 with st.form("input_form"):
     col1, col2 = st.columns([3, 1])
     
@@ -37,20 +40,24 @@ with st.form("input_form"):
     with col2:
         servings = st.slider("Servings", min_value=1, max_value=8, value=2)
         
-    # This button submits the form
     submitted = st.form_submit_button("Let's Cook", use_container_width=True)
 
-# Initialize session state to keep data alive after clicking buttons
+# Initialize session state
 if "ingredients" not in st.session_state:
     st.session_state.ingredients = None
 if "dish_name" not in st.session_state:
     st.session_state.dish_name = ""
+if "generated_recipe" not in st.session_state:
+    st.session_state.generated_recipe = False
 
 # 4. The Logic (Triggered by the Form)
 if submitted and dish:
     st.session_state.dish_name = dish
+    # Reset previous recipe if starting new
+    st.session_state.ingredients = None
+    st.session_state.recipe_text = None
+    st.session_state.generated_recipe = False
     
-    # The "Status" Log - Shows transparency
     with st.status("👨‍🍳 Sous is analyzing...", expanded=True) as status:
         st.write("Searching culinary database...")
         
@@ -65,7 +72,6 @@ if submitted and dish:
         
         try:
             response = model.generate_content(prompt)
-            # Clean up JSON formatting if the AI adds backticks
             cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
             data = json.loads(cleaned_text)
             st.session_state.ingredients = data
@@ -75,50 +81,48 @@ if submitted and dish:
             status.update(label="Connection Error", state="error")
             st.error(f"Oops: {e}")
 
-# 5. The "Triage" Dashboard (Only shows if we have data)
+# 5. The "Triage" Dashboard
 if st.session_state.ingredients:
     data = st.session_state.ingredients
     
     st.divider()
     st.subheader(f"Inventory Check: {st.session_state.dish_name}")
     
-    # Layout: Two columns for cleaner UI
     col_heroes, col_vars = st.columns(2)
     
     with col_heroes:
         st.info("🛡️ **The Heroes** (Must Haves)")
-        # We assume heroes are present, but if unchecked, we block.
         heroes_checks = []
         for item in data['heroes']:
-            # Checked by default
             is_checked = st.checkbox(item, value=True, key=f"h_{item}")
             heroes_checks.append(is_checked)
             
     with col_vars:
         st.warning("🎨 **The Variables** (Swappable)")
-        # We track what is UNCHECKED here
         missing_vars = []
         for item in data['variables']:
             is_checked = st.checkbox(item, value=True, key=f"v_{item}")
             if not is_checked:
                 missing_vars.append(item)
 
-    # 6. The "Action" Section
-    st.write("") # Spacer
-    
-    # Logic Gate: Are all heroes present?
+    st.write("") 
+
+    # Logic Gate
     if all(heroes_checks):
         generate_btn = st.button("Generate My Recipe", type="primary", use_container_width=True)
         
-        # We use session state to "remember" the recipe so it doesn't vanish if you click other buttons
         if generate_btn:
             st.session_state.generated_recipe = True
             
         if st.session_state.get("generated_recipe"):
             
-            # Only run the AI if we haven't already (or if user requested a redo)
             if "recipe_text" not in st.session_state or generate_btn:
                 with st.spinner("👨‍🍳 Sous is writing your custom recipe..."):
+                    
+                    # --- SLEEP FIX ---
+                    # We pause for 2 seconds to ensure we don't hit the speed limit
+                    time.sleep(2) 
+                    
                     final_prompt = f"""
                     Act as a professional chef named 'Sous'.
                     Create a recipe for {st.session_state.dish_name} (Servings: {servings}).
@@ -129,37 +133,34 @@ if st.session_state.ingredients:
                     2. Then provide the full step-by-step recipe. 
                     3. Be concise and encouraging.
                     """
-                    recipe_response = model.generate_content(final_prompt)
-                    st.session_state.recipe_text = recipe_response.text
+                    try:
+                        recipe_response = model.generate_content(final_prompt)
+                        st.session_state.recipe_text = recipe_response.text
+                    except Exception as e:
+                        st.error("Too much traffic! Please wait 1 minute and try again.")
+                        st.stop()
 
-            # --- DISPLAY THE RESULT ---
+            # --- DISPLAY ---
             st.markdown("---")
-            
-            # 1. The "Fix" Box
             if missing_vars:
                 st.success(f"💡 **Adaptive Mode Active:** Substitutes found for {', '.join(missing_vars)}.")
             
-            # 2. The Recipe
-            st.markdown(st.session_state.recipe_text)
-            
-            st.markdown("---")
-            
-            # 3. Action Buttons (Copy & Remix)
-            col_copy, col_reset = st.columns(2)
-            
-            with col_copy:
-                # The "Copy" Hack: We use a code block because it has a built-in copy button!
-                # We hide it in an expander so it doesn't look ugly.
-                with st.expander("📋 Click to Copy Recipe"):
-                    st.code(st.session_state.recipe_text, language="markdown")
-            
-            with col_reset:
-                if st.button("🔄 Start Over", use_container_width=True):
-                    # Clear everything to restart
-                    st.session_state.ingredients = None
-                    st.session_state.recipe_text = None
-                    st.session_state.generated_recipe = False
-                    st.rerun()
+            if st.session_state.recipe_text:
+                st.markdown(st.session_state.recipe_text)
+                
+                st.markdown("---")
+                col_copy, col_reset = st.columns(2)
+                
+                with col_copy:
+                    with st.expander("📋 Click to Copy Recipe"):
+                        st.code(st.session_state.recipe_text, language="markdown")
+                
+                with col_reset:
+                    if st.button("🔄 Start Over", use_container_width=True):
+                        st.session_state.ingredients = None
+                        st.session_state.recipe_text = None
+                        st.session_state.generated_recipe = False
+                        st.rerun()
 
     else:
         st.error("🛑 Hold up! You are missing a 'Hero' ingredient. We can't make this dish without it.")
