@@ -108,30 +108,58 @@ if st.session_state.ingredients:
     
     # Logic Gate: Are all heroes present?
     if all(heroes_checks):
-        if st.button("Generate My Recipe", type="primary", use_container_width=True):
+        generate_btn = st.button("Generate My Recipe", type="primary", use_container_width=True)
+        
+        # We use session state to "remember" the recipe so it doesn't vanish if you click other buttons
+        if generate_btn:
+            st.session_state.generated_recipe = True
             
-            with st.spinner("Writing your custom recipe..."):
-                final_prompt = f"""
-                Act as a professional chef named 'Sous'.
-                Create a recipe for {st.session_state.dish_name} (Servings: {servings}).
-                
-                CONSTRAINT: The user is MISSING these ingredients: {missing_vars}.
-                
-                1. If there are missing ingredients, you MUST explicitly list how you are fixing it in a "Chef's Note" at the top.
-                2. Then provide the full step-by-step recipe. 
-                3. Be concise and encouraging.
-                """
-                
-                recipe_response = model.generate_content(final_prompt)
-                
-                # Dynamic Output Display
-                st.markdown("---")
-                
-                # If they missed items, we highlight the "Fix"
-                if missing_vars:
-                    st.success(f"💡 **Adaptive Mode Active:** finding substitutes for {', '.join(missing_vars)}...")
-                
-                st.markdown(recipe_response.text)
-                
+        if st.session_state.get("generated_recipe"):
+            
+            # Only run the AI if we haven't already (or if user requested a redo)
+            if "recipe_text" not in st.session_state or generate_btn:
+                with st.spinner("👨‍🍳 Sous is writing your custom recipe..."):
+                    final_prompt = f"""
+                    Act as a professional chef named 'Sous'.
+                    Create a recipe for {st.session_state.dish_name} (Servings: {servings}).
+                    
+                    CONSTRAINT: The user is MISSING these ingredients: {missing_vars}.
+                    
+                    1. If there are missing ingredients, you MUST explicitly list how you are fixing it in a "Chef's Note" at the top.
+                    2. Then provide the full step-by-step recipe. 
+                    3. Be concise and encouraging.
+                    """
+                    recipe_response = model.generate_content(final_prompt)
+                    st.session_state.recipe_text = recipe_response.text
+
+            # --- DISPLAY THE RESULT ---
+            st.markdown("---")
+            
+            # 1. The "Fix" Box
+            if missing_vars:
+                st.success(f"💡 **Adaptive Mode Active:** Substitutes found for {', '.join(missing_vars)}.")
+            
+            # 2. The Recipe
+            st.markdown(st.session_state.recipe_text)
+            
+            st.markdown("---")
+            
+            # 3. Action Buttons (Copy & Remix)
+            col_copy, col_reset = st.columns(2)
+            
+            with col_copy:
+                # The "Copy" Hack: We use a code block because it has a built-in copy button!
+                # We hide it in an expander so it doesn't look ugly.
+                with st.expander("📋 Click to Copy Recipe"):
+                    st.code(st.session_state.recipe_text, language="markdown")
+            
+            with col_reset:
+                if st.button("🔄 Start Over", use_container_width=True):
+                    # Clear everything to restart
+                    st.session_state.ingredients = None
+                    st.session_state.recipe_text = None
+                    st.session_state.generated_recipe = False
+                    st.rerun()
+
     else:
         st.error("🛑 Hold up! You are missing a 'Hero' ingredient. We can't make this dish without it.")
