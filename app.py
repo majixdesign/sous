@@ -17,11 +17,12 @@ st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600;700&display=swap');
 
+        /* GLOBAL FONT */
         html, body, [class*="css"] {
             font-family: 'Archivo', sans-serif;
-            color: #1a1a1a;
         }
 
+        /* 1. LIGHT MODE DEFAULTS */
         h1 {
             font-family: 'Archivo', sans-serif !important;
             font-weight: 700 !important;
@@ -29,7 +30,8 @@ st.markdown("""
             color: #000000 !important;
             letter-spacing: -0.02em;
         }
-        
+
+        /* Form Button (Let's Cook) */
         div[data-testid="stForm"] button[kind="secondaryFormSubmit"] {
             background-color: #000000 !important;
             color: #ffffff !important;
@@ -43,11 +45,13 @@ st.markdown("""
             letter-spacing: 0.05em;
         }
 
+        /* Metrics */
         div[data-testid="stMetricValue"] {
             font-family: 'Archivo', sans-serif;
             font-weight: 600;
         }
-
+        
+        /* Footer */
         .footer {
             position: fixed;
             bottom: 15px;
@@ -56,6 +60,20 @@ st.markdown("""
             color: #aaa;
             font-family: 'Archivo', sans-serif;
             text-align: right;
+        }
+
+        /* 2. DARK MODE OVERRIDES */
+        @media (prefers-color-scheme: dark) {
+            /* Title becomes Light Grey */
+            h1 {
+                color: #e0e0e0 !important;
+            }
+            
+            /* Button becomes White so it pops on black */
+            div[data-testid="stForm"] button[kind="secondaryFormSubmit"] {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+            }
         }
         
         #MainMenu {visibility: hidden;}
@@ -95,7 +113,7 @@ model = get_working_model()
 # --- 4. HELPER FUNCTIONS ---
 
 def clean_list(raw_list):
-    """Surgical Cleaner: Specific list cleaning only."""
+    """Surgical Cleaner."""
     clean_items = []
     IGNORE_LIST = ["none", "null", "n/a", "undefined", "", "missing", "optional", "core", "character", "must_haves", "soul"]
     
@@ -139,6 +157,23 @@ def copy_to_clipboard_button(text):
     escaped_text = text.replace("\n", "\\n").replace("\"", "\\\"")
     components.html(
         f"""
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600&display=swap');
+            body {{ margin: 0; }}
+            .btn {{
+                background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 8px; 
+                padding: 10px 20px; font-family: 'Archivo', sans-serif; font-size: 14px; 
+                cursor: pointer; width: 100%; font-weight: 600; color: #333;
+                transition: all 0.2s;
+            }}
+            .btn:hover {{ background-color: #e0e0e0; }}
+            
+            /* DARK MODE */
+            @media (prefers-color-scheme: dark) {{
+                .btn {{ background-color: #333; color: #e0e0e0; border: 1px solid #555; }}
+                .btn:hover {{ background-color: #444; }}
+            }}
+        </style>
         <script>
         function copyToClipboard() {{
             const str = "{escaped_text}";
@@ -153,10 +188,7 @@ def copy_to_clipboard_button(text):
             setTimeout(() => {{ btn.innerText = "📄 Copy to Clipboard"; }}, 2000);
         }}
         </script>
-        <button id="copyBtn" onclick="copyToClipboard()" style="
-            background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 8px; 
-            padding: 10px 20px; font-family: 'Archivo', sans-serif; font-size: 14px; 
-            cursor: pointer; width: 100%; font-weight: 600; color: #333;">
+        <button id="copyBtn" class="btn" onclick="copyToClipboard()">
             📄 Copy to Clipboard
         </button>
         """,
@@ -165,18 +197,37 @@ def copy_to_clipboard_button(text):
 
 def speak_text_button(text):
     """
-    Browser-native Text-to-Speech with Stop button.
+    Browser-native Text-to-Speech with Dark Mode Support.
     """
     escaped_text = text.replace("\n", " ").replace("\"", "'")
     components.html(
         f"""
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600&display=swap');
+            body {{ margin: 0; }}
+            .container {{ display: flex; gap: 10px; margin-top: 15px; }}
+            .btn {{
+                padding: 8px 15px; font-family: 'Archivo', sans-serif; font-size: 13px; 
+                cursor: pointer; font-weight: 600; border-radius: 8px; transition: all 0.2s;
+            }}
+            
+            /* LIGHT MODE (Default) */
+            .btn-play {{ flex: 1; background-color: #ffffff; border: 1px solid #000; color: #000; }}
+            .btn-stop {{ flex: 0 0 auto; background-color: #f0f0f0; border: 1px solid #ccc; color: #333; }}
+            
+            /* DARK MODE */
+            @media (prefers-color-scheme: dark) {{
+                .btn-play {{ background-color: #ffffff; border: 1px solid #fff; color: #000; }} /* High Contrast */
+                .btn-stop {{ background-color: #333; border: 1px solid #555; color: #e0e0e0; }}
+            }}
+        </style>
         <script>
         var synth = window.speechSynthesis;
         var utterance = new SpeechSynthesisUtterance("{escaped_text}");
         utterance.rate = 0.9;
         
         function play() {{
-            synth.cancel(); // Stop any previous
+            synth.cancel();
             synth.speak(utterance);
         }}
         
@@ -184,19 +235,9 @@ def speak_text_button(text):
             synth.cancel();
         }}
         </script>
-        <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <button onclick="play()" style="
-                flex: 1; background-color: #ffffff; border: 1px solid #000; border-radius: 8px; 
-                padding: 8px 15px; font-family: 'Archivo', sans-serif; font-size: 13px; 
-                cursor: pointer; font-weight: 600; color: #000;">
-                ▶️ Read
-            </button>
-            <button onclick="stop()" style="
-                flex: 0 0 auto; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 8px; 
-                padding: 8px 15px; font-family: 'Archivo', sans-serif; font-size: 13px; 
-                cursor: pointer; font-weight: 600; color: #333;">
-                ⏹️ Stop
-            </button>
+        <div class="container">
+            <button onclick="play()" class="btn btn-play">▶️ Read</button>
+            <button onclick="stop()" class="btn btn-stop">⏹️ Stop</button>
         </div>
         """,
         height=60
@@ -395,7 +436,7 @@ if st.session_state.recipe_data:
             # HEADER
             st.markdown("**🔥 Instructions**")
             
-            # STEPS (Numbering Fix: Aggressive Regex)
+            # STEPS
             for idx, step in enumerate(r.get('steps', [])):
                 clean_step = re.sub(r'^[\d\.\s\*\-]+', '', step)
                 st.markdown(f"**{idx+1}.** {clean_step}")
@@ -403,7 +444,7 @@ if st.session_state.recipe_data:
             st.markdown("---")
             st.caption(f"✨ **Chef's Secret:** {r.get('chef_tip', '')}")
             
-            # AUDIO CONTROLS (Moved to Bottom)
+            # AUDIO CONTROLS (Moved to Bottom + Dark Mode Aware)
             speech_text = f"Recipe for {st.session_state.dish_name}. "
             if show_strategy: speech_text += f"Strategy: {pivot_msg}. "
             speech_text += "Instructions: "
