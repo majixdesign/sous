@@ -54,7 +54,7 @@ model = get_working_model()
 def extract_items(data_section):
     """
     Handles cases where AI returns a Dict (Key:Value) OR a List.
-    Always returns a clean list of strings (the actual ingredients).
+    Always returns a clean list of strings.
     """
     if not data_section:
         return []
@@ -63,7 +63,6 @@ def extract_items(data_section):
         return data_section
         
     if isinstance(data_section, dict):
-        # If it's a dict (e.g. "meat": "Mutton 500g"), return the VALUES.
         return list(data_section.values())
         
     return []
@@ -138,7 +137,7 @@ if submitted and dish:
 if st.session_state.ingredients:
     data = st.session_state.ingredients
     
-    # --- USE SMART EXTRACTOR ---
+    # Extract Lists
     raw_must = data.get('must_haves') or data.get('must_have')
     list_must = extract_items(raw_must)
     
@@ -183,15 +182,18 @@ if st.session_state.ingredients:
 
     st.write("") 
     if all(must_haves) and list_must:
+        
+        # --- FIX: Calculate Missing Items HERE (Global Scope) ---
+        # This ensures 'all_missing' exists even if we don't click the button today.
+        all_missing = soul_missing + pantry_missing
+        confirmed_inventory = list_must + soul_available + pantry_available
+        
         gen_btn = st.button("Generate Chef's Recipe", type="primary", use_container_width=True)
         if gen_btn: st.session_state.generated_recipe = True
             
         if st.session_state.get("generated_recipe"):
             if "recipe_text" not in st.session_state or gen_btn:
                 with st.spinner("👨‍🍳 Chef is planning the strategy..."):
-                    
-                    confirmed_inventory = list_must + soul_available + pantry_available
-                    all_missing = soul_missing + pantry_missing
                     
                     final_prompt = f"""
                     Act as 'Sous', a warm, expert home chef.
@@ -220,7 +222,7 @@ if st.session_state.ingredients:
                 st.markdown(st.session_state.recipe_text)
                 st.markdown("---")
                 col_copy, col_reset = st.columns(2)
-                # FIXED TYPO HERE (was c_copy)
+                
                 with col_copy:
                     with st.expander("📋 Copy Recipe"):
                         st.code(st.session_state.recipe_text, language="markdown")
