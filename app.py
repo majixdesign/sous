@@ -56,14 +56,13 @@ if submitted and dish:
     with st.status("👨‍🍳 Sous is analyzing the recipe...", expanded=True) as status:
         st.write("Checking culinary requirements...")
         
-        # --- THE FIX: STRICTER DEFINITIONS ---
         prompt = f"""
         I want to cook {dish} for {servings} people.
         Return ONLY a JSON object with these 3 keys:
         
         1. 'heroes': List 3-4 CORE ingredients that define the dish (e.g., The main meat, the specific rice, the main vegetable).
-        2. 'variables': List 5-6 SECONDARY ingredients that add flavor but might be missing in a home kitchen (e.g., Fresh herbs like Mint/Coriander, specific spices like Saffron/Star Anise, specialty dairy like Ghee/Cream). DO NOT list alternative meats or completely different main ingredients here.
-        3. 'pantry': List basic items assumed to be in stock (Oil, Salt, Water, Onions, Ginger-Garlic paste, Chili powder).
+        2. 'variables': List 5-6 SECONDARY ingredients that add flavor but might be missing in a home kitchen (e.g., Fresh herbs like Mint/Coriander, specific spices like Saffron/Star Anise, specialty dairy like Ghee/Cream). DO NOT list alternative meats here.
+        3. 'pantry': List basic items assumed to be in stock (Oil, Salt, Water, Onions, Ginger-Garlic paste, Chili powder, Turmeric, Cumin).
         """
         
         try:
@@ -73,7 +72,7 @@ if submitted and dish:
                     {"role": "system", "content": "You are an expert chef. You understand traditional recipes accurately. Output JSON only."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.1, # Keep it strict for the ingredient list
+                temperature=0.1,
                 response_format={"type": "json_object"}
             )
             
@@ -97,11 +96,13 @@ if st.session_state.ingredients:
         heroes = [st.checkbox(i, True, key=f"h_{i}") for i in data.get('heroes', [])]
     with c2:
         st.warning("🎨 **Flavor Builders** (Check what you have)")
-        # We invert the logic here: Unchecking means you MISS it.
-        # So we show them all checked by default.
+        # Logic: Unchecked means MISSING
         missing = []
+        available_vars = []
         for i in data.get('variables', []):
-            if not st.checkbox(i, value=True, key=f"v_{i}"):
+            if st.checkbox(i, value=True, key=f"v_{i}"):
+                available_vars.append(i)
+            else:
                 missing.append(i)
 
     st.write("") 
@@ -113,21 +114,26 @@ if st.session_state.ingredients:
             if "recipe_text" not in st.session_state or gen_btn:
                 with st.spinner("👨‍🍳 Chef is writing detailed instructions..."):
                     
+                    # --- THE FIX: Pass the CONFIRMED list ---
+                    confirmed_list = data.get('heroes', []) + data.get('pantry', []) + available_vars
+                    
                     system_persona = """
                     You are 'Sous', a warm, encouraging, expert home chef.
                     Your recipes are authentic and mouth-watering.
-                    Do NOT be robotic. Use bolding for ingredients and steps. 
-                    Add a 'Chef's Tip' at the end.
+                    Do NOT be robotic. Use bolding for ingredients and steps.
                     """
                     
                     user_request = f"""
                     Create a recipe for {st.session_state.dish_name} ({servings} servings).
                     
-                    CRITICAL: The user is MISSING these flavor builders: {missing}.
+                    CRITICAL INVENTORY CONTEXT:
+                    1. The User HAS these ingredients: {confirmed_list}. USE THEM EXACTLY (e.g., if 'Ginger-Garlic Paste' is listed, do not ask for chopped ginger).
+                    2. The User is MISSING: {missing}.
                     
                     Structure:
-                    1. **The Fix:** Start by reassuring the user about the missing items. Suggest a simple kitchen hack or substitute (e.g., "No saffron? We'll use a pinch of turmeric for color and rely on the ghee for richness.").
-                    2. **The Recipe:** Step-by-step, engaging instructions. Focus on technique (e.g., "Sear the meat until brown").
+                    1. **The Fix:** Briefly explain how we adapt to the missing items.
+                    2. **The Ingredients:** List the full shopping list (Heroes + Pantry + Available Variables).
+                    3. **The Recipe:** Step-by-step, engaging instructions.
                     """
                     
                     try:
@@ -137,7 +143,7 @@ if st.session_state.ingredients:
                                 {"role": "system", "content": system_persona},
                                 {"role": "user", "content": user_request}
                             ],
-                            temperature=0.7 # Creativity enabled for the recipe text
+                            temperature=0.7 
                         )
                         st.session_state.recipe_text = resp.choices[0].message.content
                     except Exception as e:
