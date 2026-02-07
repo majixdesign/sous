@@ -78,6 +78,7 @@ else:
                 animation: glitch 0.5s infinite steps(1);
             }
             
+            /* BUTTONS: Neon Green Blocks */
             div.stButton > button, div[data-testid="stForm"] button {
                 background-color: #000 !important;
                 color: #00FF00 !important;
@@ -108,12 +109,21 @@ else:
             div[data-testid="stExpander"], div[data-testid="stForm"] {
                 border: 2px solid #333 !important; border-radius: 0px !important;
             }
+
+            /* TOAST FIX: Force Black Background so White Text shows up */
+            div[data-testid="stToast"] {
+                background-color: #000 !important;
+                border: 2px solid #00FF00 !important;
+                color: #fff !important;
+                opacity: 1 !important;
+            }
         </style>
     """, unsafe_allow_html=True)
     
+    # MARQUEE FIX: Forced Black Text (#000) on Green Background
     st.markdown("""
         <div style="background: #00FF00; overflow: hidden; white-space: nowrap; border-bottom: 3px solid #000; margin-top: -30px; margin-bottom: 20px;">
-            <div style="display: inline-block; animation: marquee 10s linear infinite; font-family: 'Space Mono'; font-weight: bold; font-size: 1.2rem; color: #000; padding: 10px;">
+            <div style="display: inline-block; animation: marquee 10s linear infinite; font-family: 'Space Mono'; font-weight: bold; font-size: 1.2rem; color: #000000 !important; padding: 10px;">
                 NO CAP /// JUST COOKING /// IT'S GIVING MICHELIN /// MAIN CHARACTER ENERGY /// NO CAP /// JUST COOKING /// IT'S GIVING MICHELIN
             </div>
         </div>
@@ -238,7 +248,7 @@ c_title, c_surprise = st.columns([4, 1])
 with c_title:
     if vibe_mode:
         st.title("SOUS") 
-        st.caption("BRUH. STOP ORDERING TAKEOUT.") # <--- THE "BRUH" UPDATE
+        st.caption("BRUH. STOP ORDERING TAKEOUT.") 
     else:
         st.title("Sous")
         st.caption("The adaptive kitchen co-pilot.")
@@ -293,7 +303,8 @@ if submitted or st.session_state.trigger_search:
 if st.session_state.ingredients:
     if not st.session_state.toast_shown:
         if vibe_mode:
-            st.toast("W. WE ARE SO BACK.", icon="🟩")
+            # THE FIX: Gen Z Toast
+            st.toast("WE ARE LOCKED IN. 🔒", icon="🎒")
         else:
             st.toast("Mise en place ready.", icon="🧑‍🍳")
         st.session_state.toast_shown = True
