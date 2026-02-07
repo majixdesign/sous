@@ -13,98 +13,111 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Sous", page_icon="🍳", layout="wide")
 
 # --- 1. VIBE CONTROLLER ---
-# We place the toggle in the top corner first so we can load CSS based on it.
 c_ph, c_toggle = st.columns([6, 1])
 with c_toggle:
-    vibe_mode = st.toggle("✨ Vibe Mode")
+    vibe_mode = st.toggle("⚡ Brutal Mode")
 
 # --- 2. DYNAMIC DESIGN SYSTEM ---
-# Common Imports
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;600;700&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
     </style>
 """, unsafe_allow_html=True)
 
 if not vibe_mode:
-    # === SYSTEM MODE (The Architect) ===
+    # === SYSTEM MODE (The Architect - Default) ===
     st.markdown("""
         <style>
-            html, body, [class*="css"] { font-family: 'Archivo', sans-serif; color: #1a1a1a; }
-            
-            /* Typography */
-            h1 { font-family: 'Archivo', sans-serif !important; font-weight: 700; letter-spacing: -0.02em; color: #000; }
+            html, body, [class*="css"] { font-family: 'Archivo', sans-serif; }
+            h1 { font-family: 'Archivo', sans-serif !important; font-weight: 700; letter-spacing: -0.02em; }
             
             /* Buttons (Systemic) */
-            div[data-testid="stForm"] button {
+            div.stButton > button, div[data-testid="stForm"] button {
                 background-color: #000 !important; color: #fff !important; border-radius: 8px;
                 text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; border: none;
+                height: auto; padding: 0.6rem 1.2rem;
             }
-            
-            /* Dark Mode Overrides for System */
             @media (prefers-color-scheme: dark) {
                 h1 { color: #e0e0e0 !important; }
-                div[data-testid="stForm"] button { background-color: #fff !important; color: #000 !important; }
+                div.stButton > button, div[data-testid="stForm"] button { background-color: #fff !important; color: #000 !important; }
             }
         </style>
     """, unsafe_allow_html=True)
 
 else:
-    # === VIBE MODE (The Cosmic) ===
+    # === NEO-BRUTAL MODE (The Raw Code) ===
     st.markdown("""
         <style>
-            /* Global Gradient Background */
+            /* 1. BACKGROUND: Pitch Black with Dot Grid */
             .stApp {
-                background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-                background-attachment: fixed;
+                background-color: #050505;
+                background-image: radial-gradient(#333 1px, transparent 0);
+                background-size: 20px 20px;
             }
             
-            html, body, [class*="css"] { font-family: 'Space Grotesk', sans-serif; color: #e0e0e0; }
+            /* 2. TEXT: Force White/Monospace */
+            html, body, [class*="css"], p, label, div, span {
+                font-family: 'Space Mono', monospace !important;
+                color: #ffffff !important;
+            }
             
-            /* Typography (Neon Glow) */
+            /* 3. TITLE: Hard Glitch Shadow */
             h1 { 
-                font-family: 'Space Grotesk', sans-serif !important; 
-                font-weight: 700; 
-                background: linear-gradient(to right, #b993d6, #8ca6db);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                text-shadow: 0 0 20px rgba(138, 43, 226, 0.3);
-            }
-            
-            h2, h3 { color: #fff !important; }
-            
-            /* Glassmorphism Containers */
-            div[data-testid="stVerticalBlock"] > div {
-                /* Subtle glass effect on containers if possible, mainly affects text readability */
-            }
-            
-            /* Buttons (Pill Shape + Gradient) */
-            div[data-testid="stForm"] button {
-                background: linear-gradient(90deg, #8E2DE2, #4A00E0) !important;
+                font-family: 'Space Mono', monospace !important; 
+                font-weight: 700 !important;
+                text-transform: uppercase;
+                letter-spacing: -0.05em;
+                font-size: 3.5rem !important;
                 color: #fff !important;
-                border-radius: 50px !important; /* The Pill */
-                font-family: 'Space Grotesk';
-                font-weight: 600;
-                border: 1px solid rgba(255,255,255,0.2);
-                box-shadow: 0 4px 15px rgba(74, 0, 224, 0.4);
-            }
-            div[data-testid="stForm"] button:hover {
-                transform: scale(1.02);
-                box-shadow: 0 6px 20px rgba(74, 0, 224, 0.6);
+                text-shadow: 4px 4px 0px #FF00FF; /* Magenta Hard Shadow */
             }
             
-            /* Inputs (Glass) */
+            /* Headers */
+            h2, h3, h4 { color: #fff !important; font-weight: 700 !important; }
+            
+            /* CHECKBOX FIX */
+            div[data-testid="stCheckbox"] label span { color: #fff !important; }
+            
+            /* 4. BUTTONS: Sharp Blocks, Neon Borders, Hard Shadows */
+            div.stButton > button, div[data-testid="stForm"] button {
+                background-color: #000 !important;
+                color: #00FF00 !important; /* Neon Green Text */
+                border: 2px solid #00FF00 !important;
+                border-radius: 0px !important; /* SHARP */
+                font-family: 'Space Mono', monospace !important;
+                font-weight: 700;
+                text-transform: uppercase;
+                box-shadow: 6px 6px 0px #00FF00 !important; /* Hard Shadow */
+                transition: all 0.1s;
+            }
+            
+            div.stButton > button:hover, div[data-testid="stForm"] button:hover {
+                transform: translate(2px, 2px);
+                box-shadow: 2px 2px 0px #00FF00 !important;
+                color: #000 !important;
+                background-color: #00FF00 !important;
+            }
+
+            /* Inputs (Sharp & Raw) */
             input {
-                background: rgba(255, 255, 255, 0.05) !important;
-                border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                background: #000 !important;
+                border: 2px solid #333 !important;
                 color: #fff !important;
-                border-radius: 12px !important;
+                border-radius: 0px !important;
+                font-family: 'Space Mono', monospace !important;
+            }
+            
+            /* Toast */
+            div[data-testid="stToast"] {
+                border-radius: 0px !important;
+                border: 2px solid #fff !important;
+                background-color: #000 !important;
             }
         </style>
     """, unsafe_allow_html=True)
 
-# --- 3. CONFIGURATION & LOGIC (Unchanged) ---
+# --- 3. CONFIGURATION & LOGIC ---
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 
@@ -161,47 +174,48 @@ def copy_to_clipboard_button(text, is_vibe):
     escaped_text = text.replace("\n", "\\n").replace("\"", "\\\"")
     # Dynamic styling for the component
     if is_vibe:
-        btn_style = "background: linear-gradient(90deg, #8E2DE2, #4A00E0); color: white; border-radius: 50px; border: none; font-family: 'Space Grotesk';"
+        # Neo Brutal Style for Component
+        btn_style = "background-color: #000; color: #00FF00; border: 2px solid #00FF00; box-shadow: 4px 4px 0px #00FF00; font-family: 'Space Mono', monospace; border-radius: 0px;"
     else:
         btn_style = "background-color: #f0f0f0; color: #333; border-radius: 8px; border: 1px solid #ccc; font-family: 'Archivo';"
         
     components.html(
         f"""
-        <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600&family=Space+Grotesk:wght@600&display=swap');</style>
+        <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600&family=Space+Mono:wght@700&display=swap');</style>
         <script>
         function copyToClipboard() {{
             const str = "{escaped_text}";
             const el = document.createElement('textarea');
             el.value = str; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
-            const btn = document.getElementById("copyBtn"); btn.innerText = "✨ Copied!"; setTimeout(() => {{ btn.innerText = "📄 Copy Recipe"; }}, 2000);
+            const btn = document.getElementById("copyBtn"); btn.innerText = "COPIED!"; setTimeout(() => {{ btn.innerText = "COPY RECIPE"; }}, 2000);
         }}
         </script>
-        <button id="copyBtn" onclick="copyToClipboard()" style="{btn_style} padding: 10px 20px; font-size: 14px; cursor: pointer; width: 100%; font-weight: 600;">📄 Copy Recipe</button>
-        """, height=50
+        <button id="copyBtn" onclick="copyToClipboard()" style="{btn_style} padding: 10px 20px; font-size: 14px; cursor: pointer; width: 100%; font-weight: 700; text-transform: uppercase;">COPY RECIPE</button>
+        """, height=60
     )
 
 def speak_text_button(text, is_vibe):
     escaped_text = text.replace("\n", " ").replace("\"", "'")
     if is_vibe:
-        btn_play = "background: linear-gradient(90deg, #00c6ff, #0072ff); color: white; border-radius: 50px; border: none; font-family: 'Space Grotesk';"
-        btn_stop = "background: rgba(255,255,255,0.1); color: white; border-radius: 50px; border: 1px solid rgba(255,255,255,0.2); font-family: 'Space Grotesk';"
+        btn_play = "background-color: #000; color: #00FF00; border: 2px solid #00FF00; box-shadow: 4px 4px 0px #00FF00; font-family: 'Space Mono', monospace; border-radius: 0px;"
+        btn_stop = "background-color: #000; color: #FF00FF; border: 2px solid #FF00FF; box-shadow: 4px 4px 0px #FF00FF; font-family: 'Space Mono', monospace; border-radius: 0px;"
     else:
         btn_play = "background-color: #ffffff; color: #000; border-radius: 8px; border: 1px solid #000; font-family: 'Archivo';"
         btn_stop = "background-color: #f0f0f0; color: #333; border-radius: 8px; border: 1px solid #ccc; font-family: 'Archivo';"
 
     components.html(
         f"""
-        <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600&family=Space+Grotesk:wght@600&display=swap');</style>
+        <style>@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600&family=Space+Mono:wght@700&display=swap');</style>
         <script>
         var synth = window.speechSynthesis; var utterance = new SpeechSynthesisUtterance("{escaped_text}"); utterance.rate = 0.9;
         function play() {{ synth.cancel(); synth.speak(utterance); }}
         function stop() {{ synth.cancel(); }}
         </script>
-        <div style="display: flex; gap: 10px; margin-top: 15px;">
-            <button onclick="play()" style="{btn_play} flex: 1; padding: 8px 15px; font-size: 13px; cursor: pointer; font-weight: 600;">▶️ Read</button>
-            <button onclick="stop()" style="{btn_stop} flex: 0 0 auto; padding: 8px 15px; font-size: 13px; cursor: pointer; font-weight: 600;">⏹️ Stop</button>
+        <div style="display: flex; gap: 15px; margin-top: 15px;">
+            <button onclick="play()" style="{btn_play} flex: 1; padding: 10px 15px; font-size: 13px; cursor: pointer; font-weight: 700; text-transform: uppercase;">▶ READ</button>
+            <button onclick="stop()" style="{btn_stop} flex: 0 0 auto; padding: 10px 15px; font-size: 13px; cursor: pointer; font-weight: 700; text-transform: uppercase;">⏹ STOP</button>
         </div>
-        """, height=60
+        """, height=70
     )
 
 GLOBAL_DISHES = ["Shakshuka", "Pad Thai", "Chicken Tikka Masala", "Beef Wellington", "Bibimbap", "Moussaka", "Paella", "Ramen", "Tacos"]
@@ -217,8 +231,8 @@ if "toast_shown" not in st.session_state: st.session_state.toast_shown = False
 c_title, c_surprise = st.columns([4, 1])
 with c_title:
     if vibe_mode:
-        st.title("Sous 🪐")
-        st.caption("The cosmic kitchen co-pilot.")
+        st.title("SOUS") # No Planet. Just Text.
+        st.caption("THE ADAPTIVE KITCHEN SYSTEM.") # Uppercase caption
     else:
         st.title("Sous")
         st.caption("The adaptive kitchen co-pilot.")
@@ -250,16 +264,16 @@ if submitted or st.session_state.trigger_search:
         st.session_state.recipe_data = None
         st.session_state.toast_shown = False
         
-        with st.spinner(f"👨‍🍳 Organizing the kitchen for {final_dish}..."):
+        with st.spinner(f"Processing Request: {final_dish}..."):
             prompt = f"Dish: {final_dish} for {servings}. Break into 'core' (Non-negotiable) and 'character' (Negotiable). JSON only."
             data = robust_api_call(prompt)
             if isinstance(data, dict): st.session_state.ingredients = data
-            else: st.error("Sous couldn't read the recipe book.")
+            else: st.error("System Failure: Unable to parse recipe data.")
 
 # DASHBOARD
 if st.session_state.ingredients:
     if not st.session_state.toast_shown:
-        st.toast("Mise en place ready!", icon="🧑‍🍳")
+        st.toast("SYSTEM READY: MISE EN PLACE INITIATED.", icon="🟩")
         st.session_state.toast_shown = True
 
     data = st.session_state.ingredients
@@ -278,8 +292,8 @@ if st.session_state.ingredients:
     
     # Dynamic Headers
     if vibe_mode:
-        h_core = "🧱 The Core (Non-Negotiables)"
-        h_char = "✨ The Vibe (Substitutes)"
+        h_core = "> CORE_COMPONENTS (REQUIRED)"
+        h_char = "> FLAVOR_MATRIX (OPTIONAL)"
     else:
         h_core = "🧱 The Core (Non-Negotiables)"
         h_char = "✨ Flavor & Substitutes"
@@ -290,7 +304,7 @@ if st.session_state.ingredients:
         core_checks = [st.checkbox(str(i), True, key=f"c_{x}") for x, i in enumerate(list_core)]
     with c2:
         st.markdown(f"**{h_char}**")
-        st.caption("*(Uncheck to get an alternative)*")
+        st.caption("*(Uncheck to substitute)*")
         character_avail = [i for x, i in enumerate(list_character) if st.checkbox(str(i), True, key=f"ch_{x}")]
         character_missing = [i for i in list_character if i not in character_avail]
 
@@ -300,7 +314,7 @@ if st.session_state.ingredients:
         if st.button("Generate Chef's Recipe", type="primary", use_container_width=True):
             all_missing = character_missing
             confirmed = list_core + character_avail
-            with st.spinner("👨‍🍳 Drafting the plan..."):
+            with st.spinner("Compiling Instructions..."):
                 final_prompt = f"""
                 Act as 'Sous'. Dish: {st.session_state.dish_name} ({servings} servings).
                 Confirmed: {confirmed}. Missing: {all_missing}.
@@ -308,20 +322,20 @@ if st.session_state.ingredients:
                 """
                 r_data = robust_api_call(final_prompt)
                 if isinstance(r_data, dict): st.session_state.recipe_data = r_data
-                else: st.error("Chef is overwhelmed.")
+                else: st.error("System Overload.")
 
-    elif not list_core: st.error("⚠️ AI Error: No ingredients found.")
-    else: st.error("🛑 You are missing Core Ingredients.")
+    elif not list_core: st.error("ERROR: No ingredients found.")
+    else: st.error("CRITICAL: Missing Core Ingredients.")
 
 # RECIPE CARD
 if st.session_state.recipe_data:
     r = st.session_state.recipe_data
     st.divider()
-    st.markdown(f"## 🥘 {st.session_state.dish_name}")
+    st.markdown(f"## {st.session_state.dish_name.upper()}")
     m1, m2, m3 = st.columns(3)
-    m1.metric("Prep", r['meta'].get('prep_time', '--'))
-    m2.metric("Cook", r['meta'].get('cook_time', '--'))
-    m3.metric("Level", r['meta'].get('difficulty', '--'))
+    m1.metric("PREP", r['meta'].get('prep_time', '--'))
+    m2.metric("COOK", r['meta'].get('cook_time', '--'))
+    m3.metric("LEVEL", r['meta'].get('difficulty', '--'))
     
     pivot_msg = r.get('pivot_strategy', '')
     show_strategy = True
@@ -329,23 +343,23 @@ if st.session_state.recipe_data:
 
     if show_strategy:
         with st.container(border=True):
-            st.markdown(f"**💡 Strategy**")
+            st.markdown(f"**STRATEGY**")
             st.info(pivot_msg)
     
     c_ing, c_step = st.columns([1, 2])
     with c_ing:
         with st.container(border=True):
-            st.markdown("**🛒 Mise en Place**")
+            st.markdown("**INVENTORY**")
             for item in r.get('ingredients_list', []): st.markdown(f"- {item}")
                 
     with c_step:
         with st.container(border=True):
-            st.markdown("**🔥 Instructions**")
+            st.markdown("**EXECUTION**")
             for idx, step in enumerate(r.get('steps', [])):
                 clean_step = re.sub(r'^[\d\.\s\*\-]+', '', step)
                 st.markdown(f"**{idx+1}.** {clean_step}")
             st.markdown("---")
-            st.caption(f"✨ **Chef's Secret:** {r.get('chef_tip', '')}")
+            st.caption(f"**SECRET:** {r.get('chef_tip', '')}")
             
             # AUDIO
             speech_text = f"Recipe for {st.session_state.dish_name}. "
@@ -358,22 +372,22 @@ if st.session_state.recipe_data:
 
     st.write("")
     
-    share_text = f"🥘 {st.session_state.dish_name}\n\n"
-    if show_strategy: share_text += f"💡 STRATEGY: {pivot_msg}\n\n"
-    share_text += "🛒 INGREDIENTS:\n"
+    share_text = f"DISH: {st.session_state.dish_name}\n\n"
+    if show_strategy: share_text += f"STRATEGY: {pivot_msg}\n\n"
+    share_text += "INGREDIENTS:\n"
     for i in r.get('ingredients_list', []): share_text += f"- {i}\n"
-    share_text += "\n🔥 INSTRUCTIONS:\n"
+    share_text += "\nINSTRUCTIONS:\n"
     for i, s in enumerate(r.get('steps', [])): 
         clean_step = re.sub(r'^[\d\.\s\*\-]+', '', s)
         share_text += f"{i+1}. {clean_step}\n"
-    share_text += f"\n✨ Chef's Secret: {r.get('chef_tip', '')}"
+    share_text += f"\nSECRET: {r.get('chef_tip', '')}"
     
     a1, a2 = st.columns(2)
     with a1:
         encoded_wa = urllib.parse.quote(share_text)
         # Dynamic WA Button
         if vibe_mode:
-            st.markdown(f"""<a href="https://wa.me/?text={encoded_wa}" target="_blank" style="text-decoration: none;"><button style="width: 100%; background: linear-gradient(90deg, #25D366, #128C7E); color: white; padding: 10px; border-radius: 50px; border: none; font-weight: 600; cursor: pointer;">💬 Share on WhatsApp</button></a>""", unsafe_allow_html=True)
+            st.markdown(f"""<a href="https://wa.me/?text={encoded_wa}" target="_blank" style="text-decoration: none;"><button style="width: 100%; background-color: #000; color: #00FF00; border: 2px solid #00FF00; box-shadow: 4px 4px 0px #00FF00; font-family: 'Space Mono'; padding: 10px; font-weight: 700; cursor: pointer; text-transform: uppercase;">💬 WhatsApp Share</button></a>""", unsafe_allow_html=True)
         else:
             st.link_button("💬 Share Recipe on WhatsApp", f"https://wa.me/?text={encoded_wa}", use_container_width=True)
         
@@ -383,7 +397,7 @@ if st.session_state.recipe_data:
             st.rerun()
             
     st.write("")
-    st.markdown("### Save Recipe")
+    st.markdown("### SAVE DATA")
     copy_to_clipboard_button(share_text, vibe_mode)
 
 # --- FOOTER ---
