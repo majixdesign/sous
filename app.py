@@ -43,43 +43,59 @@ else:
     st.markdown("""
         <style>
             .stApp { background-color: #000; background-image: radial-gradient(#222 1px, transparent 0); background-size: 30px 30px; }
-            html, body, [class*="css"], p, label, div, span { font-family: 'Space Mono', monospace !important; color: #ffffff !important; }
-            h1 { font-family: 'Space Mono', monospace !important; font-weight: 700 !important; text-transform: uppercase; font-size: 4rem !important; color: #fff !important; animation: glitch 0.5s infinite steps(1); }
             
-            /* BUTTONS: Neon Green */
+            /* GLOBAL FONT OVERRIDE (BUT EXCLUDING ICONS) */
+            html, body, p, h1, h2, h3, div, span, label, input, button { 
+                font-family: 'Space Mono', monospace !important; 
+                color: #ffffff !important; 
+            }
+            
+            /* TITLE GLITCH */
+            h1 { 
+                font-size: 4rem !important; 
+                text-transform: uppercase; 
+                animation: glitch 0.5s infinite steps(1); 
+            }
+            
+            /* NEON GREEN BUTTONS */
             div.stButton > button {
                 background-color: #000 !important; color: #00FF00 !important; border: 3px solid #00FF00 !important;
-                border-radius: 0px !important; font-family: 'Space Mono', monospace !important; font-weight: 700;
-                box-shadow: 6px 6px 0px #00FF00 !important; transition: all 0.1s; text-transform: uppercase;
+                border-radius: 0px !important; font-weight: 700; box-shadow: 6px 6px 0px #00FF00 !important; 
+                transition: all 0.1s; text-transform: uppercase;
             }
-            div.stButton > button:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #FF00FF !important; border-color: #FF00FF !important; color: #FF00FF !important; }
+            div.stButton > button:hover { 
+                transform: translate(2px, 2px); 
+                box-shadow: 2px 2px 0px #FF00FF !important; 
+                border-color: #FF00FF !important; 
+                color: #FF00FF !important; 
+            }
 
-            input { background: #000 !important; border: 2px solid #fff !important; border-bottom: 5px solid #fff !important; color: #00FF00 !important; border-radius: 0px !important; font-family: 'Space Mono', monospace !important; }
+            /* INPUT FIELDS */
+            input { 
+                background: #000 !important; border: 2px solid #fff !important; 
+                border-bottom: 5px solid #fff !important; color: #00FF00 !important; border-radius: 0px !important; 
+            }
             
-            /* EXPANDER & UPLOAD FIX - FORCED HIGH CONTRAST */
+            /* EXPANDER FIX (THE "ARROW_RIGHT" BUG KILLER) */
             div[data-testid="stExpander"] {
-                background-color: #000000 !important; border: 2px solid #00FF00 !important; border-radius: 0px !important; color: #00FF00 !important;
+                background-color: #000 !important; border: 2px solid #00FF00 !important; border-radius: 0px !important;
             }
-            div[data-testid="stExpander"] details summary {
-                color: #00FF00 !important; font-family: 'Space Mono', monospace !important;
+            div[data-testid="stExpander"] details summary p {
+                font-family: 'Space Mono', monospace !important; font-size: 1.2rem !important; color: #00FF00 !important;
             }
+            /* Reset icon font family so arrows render as arrows, not text */
             div[data-testid="stExpander"] details summary svg {
-                fill: #00FF00 !important; /* The Arrow */
-            }
-            div[data-testid="stFileUploader"] {
-                color: #00FF00 !important;
-            }
-            div[data-testid="stFileUploader"] section {
-                background-color: #111 !important; border: 1px dashed #00FF00 !important;
-            }
-            div[data-testid="stFileUploader"] button {
-                 border: 1px solid #00FF00 !important; color: #00FF00 !important;
+                font-family: sans-serif !important; fill: #00FF00 !important;
             }
 
-            div[data-testid="stToast"] { background-color: #000 !important; border: 2px solid #00FF00 !important; color: #fff !important; opacity: 1 !important; }
+            /* TOAST */
+            div[data-testid="stToast"] { 
+                background-color: #000 !important; border: 2px solid #00FF00 !important; color: #fff !important; opacity: 1 !important; 
+            }
         </style>
     """, unsafe_allow_html=True)
     
+    # MARQUEE
     st.markdown("""
         <div style="background: #3300FF; overflow: hidden; white-space: nowrap; border-bottom: 3px solid #000; margin-top: -30px; margin-bottom: 20px;">
             <div style="display: inline-block; animation: marquee 10s linear infinite; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.2rem; color: #FFFFFF !important; padding: 10px;">
@@ -98,7 +114,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 
 def get_model():
-    try: return genai.GenerativeModel("gemini-1.5-flash") # Using Flash for Vision + Speed
+    try: return genai.GenerativeModel("gemini-1.5-flash") 
     except: return genai.GenerativeModel("models/gemini-1.5-flash")
 model = get_model()
 
@@ -117,13 +133,11 @@ def clean_list(raw_list):
 
 def robust_api_call(prompt, image=None):
     try:
-        config = {"response_mime_type": "application/json"}
-        if image: response = model.generate_content([prompt, image], generation_config=config)
-        else: response = model.generate_content(prompt, generation_config=config)
+        if image: response = model.generate_content([prompt, image], generation_config={"response_mime_type": "application/json"})
+        else: response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
         return json.loads(response.text)
     except:
         try:
-            # Fallback if strict JSON fails
             if image: response = model.generate_content([prompt, image])
             else: response = model.generate_content(prompt)
             text = response.text.replace("```json", "").replace("```", "").strip()
@@ -157,45 +171,45 @@ with c_surprise:
 with st.container():
     label = "📸 SCAN FRIDGE / PANTRY (AI VISION)" if vibe_mode else "📸 Scan Ingredients"
     
-    with st.expander(label, expanded=not st.session_state.scan_done):
+    # We close the expander automatically if scan is done to show results clearly
+    is_expanded = not st.session_state.scan_done
+    
+    with st.expander(label, expanded=is_expanded):
         uploaded_file = st.file_uploader("Upload photo", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
         
         if uploaded_file:
             st.image(uploaded_file, width=200)
             if st.button("👀 Analyze & Suggest Dishes"):
-                with st.spinner("Scanning pantry..."):
+                with st.spinner("Analyzing..."):
                     img = Image.open(uploaded_file)
+                    # Simplified prompt for better reliability
                     prompt = """
-                    Analyze this image. Identify available ingredients.
-                    Based on them, SUGGEST 3 distinct dish names I could cook.
-                    
-                    OUTPUT STRICT JSON ONLY: 
-                    { "ingredients_detected": ["item1", "item2"], "suggestions": ["Dish A", "Dish B", "Dish C"] }
+                    Analyze this image. 
+                    1. List detected ingredients.
+                    2. Suggest 3 dish names I can make with these.
+                    Output JSON: { "ingredients": "ing1, ing2, ing3", "suggestions": ["Dish A", "Dish B", "Dish C"] }
                     """
                     data = robust_api_call(prompt, img)
                     
                     if isinstance(data, dict):
-                        # 1. Populate Text Input
-                        detected = ", ".join(data.get("ingredients_detected", []))
-                        st.session_state.dish_name = detected 
-                        # 2. Save Suggestions
+                        st.session_state.dish_name = data.get("ingredients", "")
                         st.session_state.suggested_dishes = data.get("suggestions", [])
                         st.session_state.scan_done = True
                         st.rerun()
 
-# --- 2. SUGGESTION CHIPS (PERSISTENT) ---
+# --- 2. SUGGESTION CHIPS (OUTSIDE EXPANDER) ---
 if st.session_state.suggested_dishes:
-    if vibe_mode: st.markdown("### 💡 FOUND THESE. CLICK TO COOK:")
-    else: st.markdown("### 💡 Suggestions based on scan:")
+    st.write("")
+    if vibe_mode: st.markdown("##### 💡 FOUND THESE. CLICK TO COOK:")
+    else: st.markdown("##### 💡 Suggestions:")
     
     cols = st.columns(3)
     for i, dish in enumerate(st.session_state.suggested_dishes):
         with cols[i]:
-            # Each button triggers a rerun with the new dish name
-            if st.button(f"🥘 {dish}", use_container_width=True, key=f"sug_{i}"):
+            if st.button(f"🥘 {dish}", use_container_width=True, key=f"s_{i}"):
                 st.session_state.dish_name = dish
                 st.session_state.trigger_search = True
-                st.session_state.suggested_dishes = [] # Clear suggestions to declutter
+                st.session_state.suggested_dishes = [] # Clear after selection
                 st.rerun()
 
 # --- 3. TEXT INPUT ---
@@ -222,7 +236,6 @@ if submitted or st.session_state.trigger_search:
         st.session_state.toast_shown = False
         
         with st.spinner(f"Loading Assets for: {final_dish}..."):
-            # Step 1: Breakdown Ingredients
             prompt = f"""
             Dish/Ingredients: "{final_dish}" for {servings} people.
             Task: If input is ingredients, pick a dish name. Break into Core/Character.
@@ -262,7 +275,6 @@ if st.session_state.ingredients:
         btn_gen = "🚀 FULL SEND (GENERATE RECIPE)" if vibe_mode else "Generate Chef's Recipe"
         if st.button(btn_gen, type="primary", use_container_width=True):
             with st.spinner("Cooking..."):
-                # --- RECIPE GENERATION ---
                 confirmed = list_core + character_avail
                 persona = "Chef Z (Gen Z slang)" if vibe_mode else "Michelin Chef"
                 
@@ -289,22 +301,18 @@ if st.session_state.recipe_data:
     st.divider()
     st.markdown(f"## {st.session_state.dish_name.upper()}")
     
-    # META
     c1, c2, c3, c4 = st.columns([1,1,1,2])
     c1.metric("PREP", r['meta'].get('prep', '--'))
     c2.metric("COOK", r['meta'].get('cook', '--'))
     c3.metric("LEVEL", r['meta'].get('level', '--'))
     
-    # TL;DR TOGGLE
     with c4:
-        st.write("") # Spacer
+        st.write("")
         is_tldr = st.toggle("⚡ SPEED RUN (TL;DR)", value=True if vibe_mode else False)
 
-    # VIBE CHECK
     if r.get('vibe_check'):
         st.info(r['vibe_check'])
 
-    # INGREDIENTS & STEPS
     c_ing, c_step = st.columns([1, 2])
     with c_ing:
         st.markdown("**INVENTORY**")
@@ -312,14 +320,10 @@ if st.session_state.recipe_data:
             
     with c_step:
         st.markdown("**THE TUTORIAL**")
-        
-        # LOGIC: Show TLDR or Full
         steps_to_show = r.get('tldr_steps', []) if is_tldr else r.get('full_steps', [])
-        
         for idx, step in enumerate(steps_to_show):
             clean_step = re.sub(r'^[\d\.\s\*\-]+', '', step)
             st.markdown(f"**{idx+1}.** {clean_step}")
-        
         st.markdown("---")
         st.caption(f"**SECRET:** {r.get('tip', '')}")
 
